@@ -36,8 +36,9 @@
               <input id="name" maxlength="20" required placeholder="e.g. Claudiu" />
             </label>
             <label class="field" id="room-name-field">
-              <span>Room name</span>
-              <input id="room-name" maxlength="40" placeholder="Sprint planning" />
+              <span>Room</span>
+              <input id="room-name" maxlength="40" placeholder="e.g. sprint-43" />
+              <small class="field-hint">Same room name, same table. Leave it empty for a private room with a secret link.</small>
             </label>
             <label class="check">
               <input type="checkbox" id="spectator" />
@@ -50,7 +51,7 @@
           </form>
         </div>
       </div>
-      <p class="footnote">Votes travel end-to-end encrypted through public relays. The room key lives only in the invite link.</p>
+      <p class="footnote">Votes travel end-to-end encrypted through public relays. Anyone who knows a room name can join it; a private room's key lives only in its link.</p>
     </section>
 
     <!-- ============ ROOM ============ -->

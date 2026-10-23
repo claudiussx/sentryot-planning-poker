@@ -3,6 +3,7 @@ import { Scene } from './scene.js';
 import { randomLook, sanitizeLook, drawPreview, drawIcon, EMOTES, SHIRTS, HAIR_STYLES, HAIR_COLORS, SKINS, ACCESSORIES } from './sprites.js';
 import { DECK, computeStats, label } from './stats.js';
 import { play, isMuted, setMuted } from './audio.js';
+import { roomSlug, parseRoomHash } from './room-name.js';
 
 const $ = (sel) => document.querySelector(sel);
 const STALE_MS = 130_000; // presence older than this is a ghost
@@ -74,9 +75,7 @@ const state = {
 };
 
 function parseHash() {
-  const h = new URLSearchParams(location.hash.slice(1));
-  const r = h.get('r');
-  return r && /^[A-Za-z0-9_-]{12,32}$/.test(r) ? { token: r } : null;
+  return parseRoomHash(location.hash);
 }
 
 // ============================================================
@@ -103,6 +102,7 @@ function initLobby() {
   $('#name').value = state.me.name;
   $('#spectator').checked = state.me.spectator;
   $('#room-name').value = '';
+  $('#room-name').oninput = () => setLobbyMode('create');
   setLobbyMode(invite ? 'join' : 'create');
 
   const controls = $('#look-controls');
@@ -154,10 +154,12 @@ function initLobby() {
 
 function setLobbyMode(mode) {
   const join = mode === 'join';
+  const invite = parseHash();
   $('#join-info').hidden = !join;
+  $('#join-info').textContent = invite?.slug ? `You are joining room "${invite.slug}".` : 'You have been invited to a planning room.';
   $('#room-name-field').hidden = join;
   $('#create-instead').hidden = !join;
-  $('#enter-btn').textContent = join ? 'Join room' : 'Create room';
+  $('#enter-btn').textContent = join || roomSlug($('#room-name').value) ? 'Join room' : 'Create room';
   $('#lobby-error').hidden = true;
 }
 
@@ -182,12 +184,18 @@ async function onEnter(e) {
   btn.textContent = 'Connecting...';
   try {
     play('pick');
-    state.token = invite ? invite.token : newToken();
+    // a typed room name is the room: the same name puts everyone at the same table
+    const typed = invite ? '' : $('#room-name').value.trim().replace(/\s+/g, ' ').slice(0, 40);
+    const slug = invite ? invite.slug : roomSlug(typed);
+    state.token = invite ? invite.token : slug ? `room:${slug}` : newToken();
+    state.roomLabel = typed || slug || 'Planning room';
     const rc = new RoomClient({ token: state.token, myId: state.me.id });
     await rc.init();
     await rc.connect();
-    if (!invite) history.replaceState(null, '', `#r=${state.token}`);
-    await enterRoom(rc, invite ? { creating: false } : { creating: true, roomName: $('#room-name').value.trim().slice(0, 40) || 'Planning room' });
+    if (!invite) history.replaceState(null, '', slug ? `#room=${slug}` : `#r=${state.token}`);
+    // only a private room is new for sure; a named one may already have people in it
+    const creating = !invite && !slug;
+    await enterRoom(rc, creating ? { creating: true, roomName: typed || 'Planning room' } : { creating: false });
   } catch (ex) {
     console.error('Failed to connect to the planning room', { token: state.token, error: ex });
     err.textContent = 'Could not reach the relay. Check your connection and try again.';
@@ -307,7 +315,7 @@ function checkHost() {
   if (!state.room) {
     // empty room with no state at all (relay forgot it): start fresh
     if (effectiveHostId(list) === state.me.id) {
-      updateRoom({ v: 1, name: 'Planning room', hostId: state.me.id, round: 1, revealed: false, topic: '', timerEnd: null, autoReveal: false, history: [], createdAt: Date.now() });
+      updateRoom({ v: 1, name: state.roomLabel || 'Planning room', hostId: state.me.id, round: 1, revealed: false, topic: '', timerEnd: null, autoReveal: false, history: [], createdAt: Date.now() });
     }
     return;
   }
@@ -436,6 +444,8 @@ function onRoom(raw) {
   const prev = state.room;
   // ignore anything older than what we already hold (our own echo included)
   if (prev && next.seq < prev.seq) return;
+  // two people opening an empty named room at once both set it up: everyone keeps the same one
+  if (prev && next.seq === prev.seq && next.hostId !== prev.hostId && next.hostId > prev.hostId) return;
   state.room = next;
 
   if (prev && next.round !== prev.round) {

@@ -221,6 +221,11 @@ input::placeholder {
   color: var(--muted);
 }
 
+.field-hint {
+  color: var(--muted);
+  font-size: 13px;
+}
+
 .check {
   display: flex;
   align-items: center;
