@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SentryOT Planning Poker</title>
+    <meta name="description" content="Pixel-art planning poker for the SentryOT team. Share a link, pick a card, raise your paper." />
+    <meta name="theme-color" content="#151a21" />
+    <link rel="icon" type="image/svg+xml" href="assets/favicon.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;500;600;700&family=Press+Start+2P&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="css/style.css" />
+  </head>
+  <body>
+    <!-- ============ LOBBY ============ -->
+    <section id="lobby" class="screen">
+      <div class="lobby-card pixel-box">
+        <header class="lobby-brand">
+          <img src="assets/logo-h.svg" alt="SentryOT" class="lobby-logo" />
+          <h1>Planning<br />Poker</h1>
+          <p class="tagline">Grab a chair. Pick a card. Raise your paper.</p>
+        </header>
+
+        <div class="lobby-grid">
+          <div class="avatar-box">
+            <div class="avatar-frame pixel-inset"><canvas id="avatar" width="44" height="60" aria-label="Your character"></canvas></div>
+            <div class="look-controls" id="look-controls"></div>
+            <button type="button" class="btn btn-small" id="reroll">Shuffle look</button>
+          </div>
+
+          <form id="lobby-form" class="lobby-form" autocomplete="off">
+            <p id="join-info" class="join-info" hidden>You have been invited to a planning room.</p>
+            <label class="field">
+              <span>Your name</span>
+              <input id="name" maxlength="20" required placeholder="e.g. Claudiu" />
+            </label>
+            <label class="field" id="room-name-field">
+              <span>Room name</span>
+              <input id="room-name" maxlength="40" placeholder="Sprint planning" />
+            </label>
+            <label class="check">
+              <input type="checkbox" id="spectator" />
+              <span class="check-box" aria-hidden="true"></span>
+              <span>Join as observer (no vote)</span>
+            </label>
+            <button type="submit" class="btn btn-primary btn-big" id="enter-btn">Create room</button>
+            <p id="lobby-error" class="error" role="alert" hidden></p>
+            <button type="button" class="link" id="create-instead" hidden>or start a new room instead</button>
+          </form>
+        </div>
+      </div>
+      <p class="footnote">Votes travel end-to-end encrypted through public relays. The room key lives only in the invite link.</p>
+    </section>
+
+    <!-- ============ ROOM ============ -->
+    <section id="room" class="screen" hidden>
+      <header class="topbar">
+        <div class="topbar-brand">
+          <img src="assets/symbol.svg" alt="SentryOT" width="34" height="33" />
+          <div>
+            <div class="topbar-kicker">SentryOT Planning Poker</div>
+            <div class="topbar-title" id="room-title">Room</div>
+          </div>
+        </div>
+        <div class="topbar-actions">
+          <span id="conn" class="conn" title="Connection"></span>
+          <button type="button" class="btn btn-primary" id="invite">Copy invite link</button>
+          <button type="button" class="btn btn-icon" id="mute" aria-label="Toggle sound"></button>
+          <button type="button" class="btn" id="leave">Leave</button>
+        </div>
+      </header>
+
+      <main class="room-main">
+        <div class="stage-col">
+          <div class="story-bar pixel-box">
+            <div class="story">
+              <span class="round-chip">Round <b id="round-no">1</b></span>
+              <span id="story-text" class="story-text"></span>
+            </div>
+            <div class="story-right">
+              <div class="status-line" id="status-line"></div>
+              <div class="host-actions" id="host-actions" hidden>
+                <button type="button" class="btn btn-primary" id="reveal">Show votes</button>
+                <button type="button" class="btn" id="next">New round</button>
+              </div>
+            </div>
+          </div>
+
+          <div id="stage" class="stage pixel-box"></div>
+
+          <div class="emote-bar">
+            <div class="emotes" id="emotes"></div>
+            <span class="hint">Tip: click a teammate to throw a paper ball</span>
+          </div>
+
+          <div class="hand" id="hand" role="group" aria-label="Your card"></div>
+
+          <div id="host-bar" class="host-bar pixel-box" hidden>
+            <div class="host-tag">You are the host</div>
+            <input id="story-input" class="story-input" maxlength="120" placeholder="Story or ticket, e.g. 23096: import dialog" aria-label="Story" />
+            <div class="timer-group" role="group" aria-label="Timer">
+              <span class="timer-label">Timer</span>
+              <button type="button" class="btn btn-small" data-timer="30">30s</button>
+              <button type="button" class="btn btn-small" data-timer="60">1m</button>
+              <button type="button" class="btn btn-small" data-timer="120">2m</button>
+              <button type="button" class="btn btn-small" data-timer="0">Off</button>
+            </div>
+            <label class="check check-small">
+              <input type="checkbox" id="auto-reveal" />
+              <span class="check-box" aria-hidden="true"></span>
+              <span>Auto-show when all voted</span>
+            </label>
+          </div>
+
+        </div>
+
+        <aside class="side-col">
+          <section id="results" class="pixel-box panel results" hidden></section>
+          <section class="pixel-box panel">
+            <h2>At the table <span id="table-count" class="count"></span></h2>
+            <ul id="player-list" class="player-list"></ul>
+          </section>
+          <section class="pixel-box panel">
+            <div class="panel-head">
+              <h2>History</h2>
+              <button type="button" class="btn btn-small" id="copy-history">Copy</button>
+            </div>
+            <ol id="history" class="history"></ol>
+          </section>
+        </aside>
+      </main>
+    </section>
+
+    <div id="toasts" class="toasts" aria-live="polite"></div>
+
+    <script type="module" src="js/main.js"></script>
+  </body>
+</html>
