@@ -6,6 +6,8 @@ const SW = 46; // seat width
 const WH = 50; // wall height
 const ROWH = 64;
 const FIRST_DESK = WH + 22;
+// keep in sync with the one-screen media query in style.css
+const FIT_SCREEN = '(min-width: 1101px) and (min-height: 600px)';
 
 const CONFETTI = [PAL.teal, PAL.cyan, PAL.gold, PAL.red, PAL.pink, PAL.green, PAL.white];
 
@@ -102,13 +104,26 @@ export class Scene {
 
   layout() {
     const cw = this.host.clientWidth || 800;
-    const S = cw < 560 ? 2 : cw < 1500 ? 3 : 4;
-    const LW = Math.max(120, Math.floor(cw / S));
+    const ch = this.host.clientHeight;
     const n = Math.max(1, this.players.length);
-    const fit = Math.max(1, Math.floor((LW - 8) / SW));
-    const rows = Math.ceil(n / fit);
-    const perRow = Math.ceil(n / rows);
-    const LH = FIRST_DESK + (rows - 1) * ROWH + 30;
+    const measure = (S) => {
+      const LW = Math.max(120, Math.floor(cw / S));
+      const fit = Math.max(1, Math.floor((LW - 8) / SW));
+      const rows = Math.ceil(n / fit);
+      return { S, LW, rows, perRow: Math.ceil(n / rows), LH: FIRST_DESK + (rows - 1) * ROWH + 30 };
+    };
+    let m;
+    if (matchMedia(FIT_SCREEN).matches && ch > 0) {
+      // the page has a fixed height here: take the biggest pixel size whose table fits it
+      for (const S of [5, 4, 3.5, 3, 2.5, 2, 1.5, 1]) {
+        m = measure(S);
+        if (m.LH * S <= ch) break;
+      }
+      m.LH = Math.max(m.LH, Math.floor(ch / m.S)); // extra height becomes floor
+    } else {
+      m = measure(cw < 560 ? 2 : cw < 1500 ? 3 : 4);
+    }
+    const { S, LW, rows, perRow, LH } = m;
 
     this.S = S;
     this.LW = LW;

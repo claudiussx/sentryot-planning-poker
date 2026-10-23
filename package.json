@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "start": "npx --yes http-server@14.1.1 -p 5180 -c-1 .",
-    "test": "node --test tests/*.test.mjs"
+    "test": "node --test tests/*.test.mjs",
+    "bump": "node -e \"const f='index.html',fs=require('fs');const s=fs.readFileSync(f,'utf8');const v=Number(s.match(/\\?v=(\\d+)/)[1])+1;fs.writeFileSync(f,s.replace(/\\?v=\\d+/g,'?v='+v));console.log('version',v)\""
   }
 }

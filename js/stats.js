@@ -1,6 +1,6 @@
 // Pure voting maths, shared by the UI and the node tests.
 
-export const DECK = ['0', '0.5', '1', '2', '3', '5', '8', '13', '20', '40', '100', '?', 'coffee'];
+export const DECK = ['0.5', '1', '2', '3', '5', '8', '13', '20', '40', '100', '?', 'coffee'];
 export const NUMERIC_DECK = DECK.filter((v) => isNumeric(v)).map(Number);
 
 export function isNumeric(v) {

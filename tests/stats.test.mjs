@@ -51,15 +51,15 @@ test('no numeric votes leaves numbers null', () => {
   assert.equal(s.distribution.length, 2);
 });
 
-test('invalid votes are ignored', () => {
-  assert.equal(computeStats(v('7', 'banana', '3')).total, 1);
+test('invalid votes are ignored, 0 included now that the card is gone', () => {
+  assert.equal(computeStats(v('7', 'banana', '3', '0')).total, 1);
 });
 
 test('nearest deck value rounds ties up', () => {
   assert.equal(nearestDeckValue(4), 5);
   assert.equal(nearestDeckValue(6.4), 5);
   assert.equal(nearestDeckValue(10.5), 13);
-  assert.equal(nearestDeckValue(0.2), 0);
+  assert.equal(nearestDeckValue(0.2), 0.5);
 });
 
 test('labels', () => {

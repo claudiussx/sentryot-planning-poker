@@ -10,15 +10,22 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;500;600;700&family=Press+Start+2P&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="css/style.css" />
+    <link rel="stylesheet" href="css/style.css?v=4" />
+    <script>
+      // apply the saved font before first paint so the page does not flash
+      try {
+        if (localStorage.getItem('sop.font') === 'normal') document.documentElement.dataset.font = 'normal';
+      } catch {}
+    </script>
   </head>
   <body>
     <!-- ============ LOBBY ============ -->
     <section id="lobby" class="screen">
       <div class="lobby-card pixel-box">
+        <button type="button" class="btn btn-small font-toggle lobby-font-toggle" aria-label="Switch font style"></button>
         <header class="lobby-brand">
           <img src="assets/logo-h.svg" alt="SentryOT" class="lobby-logo" />
-          <h1>Planning<br />Poker</h1>
+          <h1>Planning Poker</h1>
           <p class="tagline">Grab a chair. Pick a card. Raise your paper.</p>
         </header>
 
@@ -66,6 +73,7 @@
         </div>
         <div class="topbar-actions">
           <span id="conn" class="conn" title="Connection"></span>
+          <button type="button" class="btn font-toggle" aria-label="Switch font style"></button>
           <button type="button" class="btn btn-primary" id="invite">Copy invite link</button>
           <button type="button" class="btn btn-icon" id="mute" aria-label="Toggle sound"></button>
           <button type="button" class="btn" id="leave">Leave</button>
@@ -135,6 +143,22 @@
 
     <div id="toasts" class="toasts" aria-live="polite"></div>
 
-    <script type="module" src="js/main.js"></script>
+    <!-- GitHub Pages caches files for 10 minutes: every file URL carries the release version
+         (npm run bump) so a deploy never mixes old and new modules -->
+    <script type="importmap">
+      {
+        "imports": {
+          "./js/main.js": "./js/main.js?v=4",
+          "./js/net.js": "./js/net.js?v=4",
+          "./js/scene.js": "./js/scene.js?v=4",
+          "./js/sprites.js": "./js/sprites.js?v=4",
+          "./js/stats.js": "./js/stats.js?v=4",
+          "./js/audio.js": "./js/audio.js?v=4",
+          "./js/room-name.js": "./js/room-name.js?v=4",
+          "./vendor/mqtt.esm.js": "./vendor/mqtt.esm.js?v=4"
+        }
+      }
+    </script>
+    <script type="module" src="js/main.js?v=4"></script>
   </body>
 </html>

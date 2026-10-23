@@ -707,9 +707,37 @@ function wireRoomControls() {
   window.addEventListener('pageshow', (e) => e.persisted && location.reload());
   document.addEventListener('keydown', (e) => {
     if (e.target.closest('input, textarea') || e.metaKey || e.ctrlKey || e.altKey) return;
-    const map = { 0: '0', 1: '1', 2: '2', 3: '3', 5: '5', 8: '8', '?': '?', c: 'coffee' };
+    const map = { 1: '1', 2: '2', 3: '3', 5: '5', 8: '8', '?': '?', c: 'coffee' };
     if (map[e.key]) pickCard(map[e.key]);
   });
+}
+
+// Pixel font for the fun of it, a plain one for those who find it hard to read.
+function wireFontToggle() {
+  const label = () => (document.documentElement.dataset.font === 'normal' ? 'Font: Normal' : 'Font: Pixel');
+  const sync = () =>
+    document.querySelectorAll('.font-toggle').forEach((b) => {
+      b.textContent = label();
+      b.title = 'Switch between the pixel font and a normal font';
+    });
+  document.querySelectorAll('.font-toggle').forEach(
+    (b) =>
+      (b.onclick = () => {
+        const normal = document.documentElement.dataset.font !== 'normal';
+        if (normal) document.documentElement.dataset.font = 'normal';
+        else delete document.documentElement.dataset.font;
+        // raw string, not JSON: the inline script in index.html reads it before modules load
+        try {
+          localStorage.setItem('sop.font', normal ? 'normal' : 'pixel');
+        } catch {
+          /* blocked storage: the switch still works for this visit */
+        }
+        sync();
+        play('pick');
+        state.scene?.layout(); // name plates measure text
+      }),
+  );
+  sync();
 }
 
 function renderMute() {
@@ -960,6 +988,7 @@ window.sopDebug = () => ({ me: state.me, room: state.room, peers: [...state.peer
 
 (async function boot() {
   state.me.id = await resolveMyId();
+  wireFontToggle();
   initLobby();
   // a reload of a tab that was already seated goes straight back to its chair
   const invite = parseHash();
