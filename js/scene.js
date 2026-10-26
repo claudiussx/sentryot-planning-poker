@@ -180,10 +180,10 @@ export class Scene {
       el.style.top = `${(seat.dy - 46) * S}px`;
       el.style.width = `${SW * S}px`;
       el.style.height = `${65 * S}px`;
-      // the card stands on the desk edge, a little taller than the old plate
-      el.style.setProperty('--plate-top', `${52 * S}px`);
-      el.style.setProperty('--plate-h', `${11 * S}px`);
-      el.style.setProperty('--plate-inset', `${3 * S}px`);
+      // a compact card standing on the desk edge
+      el.style.setProperty('--plate-top', `${53 * S}px`);
+      el.style.setProperty('--plate-h', `${9 * S}px`);
+      el.style.setProperty('--plate-inset', `${7 * S}px`);
       el.classList.toggle('is-me', !!p.isMe);
       el.classList.toggle('is-spectator', !!p.spectator);
       el.classList.toggle('is-host', !!p.isHost);
@@ -313,35 +313,69 @@ export class Scene {
     drawMark(ctx, px + 1, 9);
     R(ctx, px + 4, 29, 12, 1, PAL.teal);
 
-    // wall screen: countdown or clock
+    // wall TV: countdown or clock, on a little wooden shelf
     const mw = 40;
     const mx = LW - mw - 8;
     if (mx > px + 26) {
-      R(ctx, mx - 2, 7, mw + 4, 24, PAL.ink);
-      R(ctx, mx, 9, mw, 20, PAL.screen);
       const steady = this.still || this.calm;
+      // shelf and feet
+      const wood = shade(PAL.plantPot, -0.08);
+      R(ctx, mx - 6, 35, mw + 12, 2, wood);
+      R(ctx, mx - 6, 35, mw + 12, 1, shade(wood, 0.12));
+      R(ctx, mx + 3, 33, 2, 2, PAL.ink);
+      R(ctx, mx + mw - 5, 33, 2, 2, PAL.ink);
+      // bezel with rounded corners, a lit top edge and a darker bottom edge
+      const bx = mx - 4;
+      const bw = mw + 8;
+      R(ctx, bx + 1, 6, bw - 2, 27, PAL.border);
+      R(ctx, bx, 7, bw, 25, PAL.border);
+      R(ctx, bx + 1, 6, bw - 2, 1, PAL.borderLight);
+      R(ctx, bx + 1, 32, bw - 2, 1, shade(PAL.border, -0.12));
+      // screen: dark glass, faint scanlines, a glint in the corner
+      R(ctx, mx - 1, 8, mw + 2, 22, PAL.ink);
+      R(ctx, mx, 9, mw, 20, PAL.screen);
+      for (let y = 10; y < 29; y += 2) R(ctx, mx, y, mw, 1, shade(PAL.screen, 0.035));
+      R(ctx, mx + 2, 10, 3, 1, shade(PAL.screen, 0.2));
+      R(ctx, mx + 2, 11, 1, 1, shade(PAL.screen, 0.2));
+
       let text;
       let color = PAL.tealDark;
-      let blinkColon = false;
+      let showColon = true;
+      let dimColon = false;
+      let urgent = false;
       if (this.room.timerEnd && !this.room.revealed) {
         const left = Math.max(0, Math.ceil((this.room.timerEnd - Date.now()) / 1000));
         text = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
-        color = left <= 10 ? (steady || Math.floor(t / 250) % 2 ? PAL.red : shade(PAL.red, -0.35)) : PAL.teal;
+        urgent = left <= 10;
+        color = urgent ? (steady || Math.floor(t / 250) % 2 ? PAL.red : shade(PAL.red, -0.35)) : PAL.teal;
       } else {
         const d = new Date();
         text = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-        blinkColon = !steady && Math.floor(t / 1000) % 2 === 0;
+        // full motion blinks the colon, minimal lets it pulse softly, off keeps it steady
+        if (this.calm) dimColon = Math.floor(t / 1000) % 2 === 0;
+        else showColon = this.still || Math.floor(t / 1000) % 2 === 1;
       }
       // size from the text with its colon, so a blinking colon never changes the digit size
       const s = textWidth(text, 2) <= mw - 4 ? 2 : 1;
       const x0 = mx + Math.floor((mw - textWidth(text, s)) / 2);
       const y0 = 9 + Math.floor((20 - 5 * s) / 2);
-      drawText(ctx, text, x0, y0, color, s);
-      if (blinkColon) {
-        const i = text.indexOf(':');
-        drawText(ctx, ':', x0 + textWidth(text.slice(0, i), s) + s, y0, PAL.screen, s);
+      // the colon is left out (not painted over) when it blinks, so the scanlines stay intact
+      const i = text.indexOf(':');
+      const before = text.slice(0, i);
+      const after = text.slice(i + 1);
+      const colonX = x0 + textWidth(before, s) + s;
+      const afterX = x0 + textWidth(`${before}:`, s) + s;
+      for (const [dx, ink] of [
+        [1, shade(color, -0.45)],
+        [0, color],
+      ]) {
+        drawText(ctx, before, x0 + dx, y0 + dx, ink, s);
+        if (showColon) drawText(ctx, ':', colonX + dx, y0 + dx, dimColon ? shade(ink, -0.35) : ink, s);
+        drawText(ctx, after, afterX + dx, y0 + dx, ink, s);
       }
-      R(ctx, mx + mw / 2 - 3, 31, 6, 3, PAL.ink);
+      // power light: green, or blinking red in the last ten seconds of a timer
+      R(ctx, mx + mw + 1, 31, 1, 1, urgent && !steady && Math.floor(t / 250) % 2 ? shade(PAL.red, -0.3) : urgent ? PAL.red : PAL.green);
+      R(ctx, mx + mw / 2 - 2, 31, 4, 1, PAL.borderLight);
     }
 
     // plant

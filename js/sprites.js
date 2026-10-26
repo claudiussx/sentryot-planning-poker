@@ -661,8 +661,10 @@ function drawBody(ctx, cx, dy, hy, look) {
 // Hands are a shade darker than the face so a hand on the chin or a cup at the mouth still reads.
 const handColor = (skin) => shade(skin, -0.2);
 
+// A resting hand: skin on top, a slightly darker row of fingers underneath.
 function hand(ctx, x, y, skin) {
-  R(ctx, x, y, 2, 2, handColor(skin));
+  R(ctx, x, y, 2, 1, skin);
+  R(ctx, x, y + 1, 2, 1, shade(skin, -0.18));
 }
 
 /**
@@ -727,8 +729,8 @@ export function drawCharacter(ctx, c) {
 
   switch (pose) {
     case 'scribble': {
-      R(ctx, cx - 9, dy + 1, 6, 3, sleeve);
-      hand(ctx, cx - 4, dy + 2, skin);
+      R(ctx, cx - 9, dy + 1, 4, 3, sleeve);
+      hand(ctx, cx - 5, dy + 2, skin);
       const wig = Math.floor(t / 70) % 6;
       const hx = cx - 1 + [0, 2, 1, 3, 0, 2][wig];
       const hyy = dy + 2 + [0, 1, 0, 1, 1, 0][wig];
@@ -739,8 +741,8 @@ export function drawCharacter(ctx, c) {
       break;
     }
     case 'think': {
-      R(ctx, cx - 9, dy + 1, 6, 3, sleeve);
-      hand(ctx, cx - 4, dy + 2, skin);
+      R(ctx, cx - 9, dy + 1, 4, 3, sleeve);
+      hand(ctx, cx - 5, dy + 2, skin);
       if (c.thinkPhase < 0.5) {
         // hand on chin
         R(ctx, cx + 5, hy + 10, 2, dy - hy - 9, raisedSleeve);
@@ -748,19 +750,20 @@ export function drawCharacter(ctx, c) {
       } else {
         // tapping the pencil
         const tap = Math.floor(t / 180) % 2;
-        R(ctx, cx + 3, dy + 1, 6, 3, sleeve);
-        drawPencil(ctx, cx + 2, dy + 1 - tap, 0);
-        hand(ctx, cx + 2, dy + 1 - tap, skin);
+        R(ctx, cx + 5, dy + 1, 4, 3, sleeve);
+        drawPencil(ctx, cx + 3, dy + 1 - tap, 0);
+        hand(ctx, cx + 3, dy + 1 - tap, skin);
       }
       break;
     }
     case 'voted':
     case 'idle':
     case 'away':
-      R(ctx, cx - 9, dy + 1, 7, 3, sleeve);
-      R(ctx, cx + 2, dy + 1, 7, 3, sleeve);
-      hand(ctx, cx - 3, dy + 2, skin);
-      hand(ctx, cx + 1, dy + 2, skin);
+      // forearms come in from the sides and the hands hold the paper's corners
+      R(ctx, cx - 9, dy + 1, 4, 3, sleeve);
+      R(ctx, cx + 5, dy + 1, 4, 3, sleeve);
+      hand(ctx, cx - 5, dy + 2, skin);
+      hand(ctx, cx + 3, dy + 2, skin);
       break;
     case 'shrug':
       R(ctx, cx - 11, ty + 3, 4, 2, sleeve);
@@ -769,8 +772,8 @@ export function drawCharacter(ctx, c) {
       hand(ctx, cx + 10, ty + 1, skin);
       break;
     case 'spectator': {
-      R(ctx, cx - 9, dy + 1, 6, 3, sleeve);
-      hand(ctx, cx - 4, dy + 2, skin);
+      R(ctx, cx - 9, dy + 1, 4, 3, sleeve);
+      hand(ctx, cx - 5, dy + 2, skin);
       const sip = (t + c.seed * 91) % 5000 < 1100;
       const mx = sip ? cx + 1 : cx + 3;
       const my = sip ? hy + 7 : dy - 2;
@@ -781,7 +784,9 @@ export function drawCharacter(ctx, c) {
       R(ctx, mx, my + 1, 4, 1, PAL.teal);
       if (!sip && Math.floor(t / 400) % 2) R(ctx, mx + 1, my - 2, 1, 1, PAL.secondary);
       else if (!sip) R(ctx, mx + 2, my - 3, 1, 1, PAL.secondary);
-      hand(ctx, mx + 3, my + 2, skin);
+      // at the mouth the hand is drawn darker so it reads against the face
+      if (sip) R(ctx, mx + 3, my + 2, 2, 2, handColor(skin));
+      else hand(ctx, mx + 3, my + 2, skin);
       break;
     }
   }

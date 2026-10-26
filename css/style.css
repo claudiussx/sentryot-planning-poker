@@ -690,8 +690,8 @@ input::placeholder {
   height: var(--plate-h);
   display: grid;
   place-items: center;
-  padding: 2px 5px 0;
-  background: linear-gradient(var(--paper-shade) 0 3px, var(--paper) 3px);
+  padding: 2px 4px 0;
+  background: linear-gradient(var(--paper-shade) 0 2px, var(--paper) 2px);
   box-shadow:
     0 0 0 2px var(--ink),
     0 5px 0 0 var(--shadow);
@@ -702,7 +702,7 @@ input::placeholder {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: clamp(11px, calc(var(--plate-h) * 0.55), 17px);
+  font-size: clamp(10px, calc(var(--plate-h) * 0.6), 15px);
   font-weight: 700;
   color: var(--ink);
   line-height: 1;
@@ -710,7 +710,7 @@ input::placeholder {
 
 /* your own card: a mint fold so you find yourself at a glance */
 .seat.is-me .plate {
-  background: linear-gradient(var(--accent) 0 3px, var(--paper) 3px);
+  background: linear-gradient(var(--accent) 0 2px, var(--paper) 2px);
   box-shadow:
     0 0 0 2px var(--ink),
     0 0 0 4px var(--accent),
@@ -739,7 +739,7 @@ input::placeholder {
 
 /* observers get a plain grey card */
 .seat.is-spectator .plate {
-  background: linear-gradient(var(--muted) 0 3px, var(--paper-shade) 3px);
+  background: linear-gradient(var(--muted) 0 2px, var(--paper-shade) 2px);
 }
 
 .seat.is-spectator .plate-name {
