@@ -1568,8 +1568,7 @@ input::placeholder {
 
 .emoji-btn {
   width: 36px;
-  min-height: 32px;
-  margin: 4px 2px 8px 4px;
+  padding: 0;
 }
 
 .emoji-btn .px-icon {
@@ -1581,13 +1580,26 @@ input::placeholder {
   display: flex;
   align-items: center;
   gap: 6px;
+  /* room for the 4 px pixel edges all three draw around themselves */
+  padding: 4px;
+}
+
+/* emoji button, message box and Send: one height, no stray margins, so they line up */
+.chat-form > * {
+  height: 36px;
+  min-height: 36px;
+  margin: 0;
 }
 
 .chat-form input {
   flex: 1;
   min-width: 0;
   font-size: 15px;
-  padding: 8px 10px;
+  padding: 0 10px;
+}
+
+.chat-form .btn-small {
+  padding: 0 12px;
 }
 
 /* ---------- settings menu ---------- */
