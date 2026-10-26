@@ -69,12 +69,45 @@ const LIGHT = {
   leafDark: '#2b8a45',
 };
 
-export const PAL = { ...DARK };
-export const SCENE = { light: false };
+// Room styles repaint the furniture on top of the theme: the office uses the theme as is,
+// the cabin swaps the walls, desks and frames for wood.
+const ROOM_STYLES = {
+  office: { name: 'Office' },
+  cabin: {
+    name: 'Cabin',
+    dark: {
+      wall: '#4a2f1f',
+      wallDark: '#2b1b12',
+      border: '#6b4428',
+      borderLight: '#946039',
+      floorLine: '#21150e',
+      sub: '#4f321e',
+      skyline: '#16301f',
+      plantPot: '#8a4f2c',
+    },
+    light: {
+      wall: '#c99560',
+      wallDark: '#a7744b',
+      border: '#7c4b2a',
+      borderLight: '#a8703f',
+      floorLine: '#8d5e3a',
+      sub: '#6e4426',
+      skyline: '#3f7a52',
+      plantPot: '#8a4f2c',
+    },
+  },
+};
+export const ROOM_STYLE_IDS = Object.keys(ROOM_STYLES);
+export const roomStyleName = (id) => (ROOM_STYLES[id] || ROOM_STYLES.office).name;
 
-export function setSceneTheme(light) {
-  Object.assign(PAL, light ? LIGHT : DARK);
+export const PAL = { ...DARK };
+export const SCENE = { light: false, style: 'office' };
+
+export function setSceneTheme(light, style = SCENE.style) {
+  const room = ROOM_STYLES[style] ? style : 'office';
+  Object.assign(PAL, light ? LIGHT : DARK, ROOM_STYLES[room][light ? 'light' : 'dark'] || {});
   SCENE.light = light;
+  SCENE.style = room;
 }
 
 export const SKINS = ['#f6d3b3', '#eabf98', '#d39b6d', '#b0784c', '#8a5532', '#5e3a22'];
@@ -322,6 +355,8 @@ const ICONS = {
   wave: ['.......', '.##..##', '#..##..', '.......', '.##..##', '#..##..', '.......'],
   pause: ['.##.##.', '.##.##.', '.##.##.', '.##.##.', '.##.##.', '.##.##.', '.##.##.'],
   font: ['.#.....', '#.#....', '#.#.##.', '###...#', '#.#.###', '#.##..#', '#.#.###'],
+  house: ['...#...', '..###..', '.#####.', '#######', '.#####.', '.##.##.', '.##.##.'],
+  grid: ['###.###', '###.###', '###.###', '.......', '###.###', '###.###', '###.###'],
   card: ['.#####.', '#.....#', '#..#..#', '#.###.#', '#..#..#', '#.....#', '.#####.'],
   check: ['......#', '.....##', '#...##.', '##.##..', '.###...', '..#....'],
   eye: ['.......', '..###..', '.#...#.', '#..#..#', '.#...#.', '..###..', '.......'],
@@ -359,6 +394,8 @@ const ICON_COLORS = {
   pause: 'secondary',
   font: 'value',
   card: 'teal',
+  house: 'gold',
+  grid: 'value',
 };
 
 const iconColor = (name) => {
@@ -636,6 +673,15 @@ function drawFace(ctx, cx, hy, look, face) {
 }
 
 export function drawChair(ctx, cx, dy) {
+  if (SCENE.style === 'cabin') {
+    // a wooden chair: two posts, a top rail and slats
+    R(ctx, cx - 9, dy - 21, 2, 21, PAL.border);
+    R(ctx, cx + 7, dy - 21, 2, 21, PAL.border);
+    R(ctx, cx - 8, dy - 22, 16, 3, PAL.borderLight);
+    for (const x of [cx - 5, cx - 1, cx + 3]) R(ctx, x, dy - 19, 2, 17, PAL.border);
+    R(ctx, cx - 9, dy - 3, 18, 3, shade(PAL.border, -0.12));
+    return;
+  }
   R(ctx, cx - 8, dy - 21, 16, 1, PAL.borderLight);
   R(ctx, cx - 9, dy - 20, 18, 20, PAL.border);
   R(ctx, cx - 8, dy - 20, 16, 1, PAL.borderLight);
@@ -866,6 +912,7 @@ export function drawBadgeCheck(ctx, x, y) {
 }
 
 export function drawDesk(ctx, x, dy, w) {
+  if (SCENE.style === 'cabin') return drawTable(ctx, x, dy, w);
   R(ctx, x, dy, w, 7, PAL.border);
   R(ctx, x, dy, w, 1, PAL.borderLight);
   R(ctx, x, dy + 7, w, 1, PAL.wallDark);
@@ -873,6 +920,22 @@ export function drawDesk(ctx, x, dy, w) {
   R(ctx, x, dy + 18, w, 1, PAL.wallDark);
   R(ctx, x + 1, dy + 19, 3, 4, PAL.wallDark);
   R(ctx, x + w - 4, dy + 19, 3, 4, PAL.wallDark);
+}
+
+// The cabin's desk: a thick plank table with seams across the top, grain on the front and sturdy legs.
+function drawTable(ctx, x, dy, w) {
+  R(ctx, x, dy, w, 7, PAL.border);
+  R(ctx, x, dy, w, 1, PAL.borderLight);
+  for (let i = x + 12; i < x + w - 3; i += 14) R(ctx, i, dy + 1, 1, 6, shade(PAL.border, -0.2));
+  R(ctx, x - 1, dy + 7, w + 2, 2, shade(PAL.border, -0.28));
+  R(ctx, x + 2, dy + 9, w - 4, 9, PAL.sub);
+  for (let y = dy + 11, k = 0; y < dy + 18; y += 3, k++) {
+    // grain in broken strokes, offset per line
+    for (let gx = x + 4 + ((k * 7) % 11); gx < x + w - 8; gx += 19) R(ctx, gx, y, 9, 1, shade(PAL.sub, -0.14));
+  }
+  R(ctx, x + 2, dy + 18, w - 4, 1, PAL.wallDark);
+  R(ctx, x + 2, dy + 18, 4, 5, shade(PAL.sub, -0.2));
+  R(ctx, x + w - 6, dy + 18, 4, 5, shade(PAL.sub, -0.2));
 }
 
 // Standalone preview for the lobby avatar picker. k: ms into the current pose.

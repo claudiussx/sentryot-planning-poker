@@ -1,6 +1,7 @@
 import { RoomClient, newToken, newId } from './net.js';
 import { Scene } from './scene.js';
-import { randomLook, sanitizeLook, drawPreview, drawIconCentered, setSceneTheme, EMOTES, EMOTE_NAMES, SHIRTS, HAIR_STYLES, HAIR_COLORS, SKINS, ACCESSORIES, DECALS, PETS } from './sprites.js';
+import { SimpleTable } from './simple.js';
+import { randomLook, sanitizeLook, drawPreview, drawIconCentered, setSceneTheme, ROOM_STYLE_IDS, roomStyleName, EMOTES, EMOTE_NAMES, SHIRTS, HAIR_STYLES, HAIR_COLORS, SKINS, ACCESSORIES, DECALS, PETS } from './sprites.js';
 import { DECKS, DECK_IDS, ALL_CARDS, deckOf, formatScale, computeStats, label } from './stats.js';
 import { computeRecap } from './recap.js';
 import qrcode from '../vendor/qrcode.mjs';
@@ -270,8 +271,7 @@ async function enterRoom(rc, { creating, roomName }) {
   $('#room').hidden = false;
 
   if (!state.scene) {
-    state.scene = new Scene($('#stage'), { onSeatClick: throwAt });
-    state.scene.setMotion(motionMode());
+    state.scene = makeStage();
     buildHand(state.room?.deck);
     buildEmotes();
     wireRoomControls();
@@ -1066,9 +1066,37 @@ function saveRaw(key, value) {
   }
 }
 
+// raw strings like the others: 'office' or 'cabin', and '1' for the simple view
+const readRaw = (key) => {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+};
+const prefs = {
+  room: ROOM_STYLE_IDS.includes(readRaw('sop.room')) ? readRaw('sop.room') : 'office',
+  simple: readRaw('sop.simple') === '1',
+};
+
+// the pixel room, or plain cards for the simple view; both take the same calls
+function makeStage() {
+  $('#room').classList.toggle('is-simple', prefs.simple);
+  const stage = prefs.simple ? new SimpleTable($('#stage')) : new Scene($('#stage'), { onSeatClick: throwAt });
+  stage.setMotion(motionMode());
+  return stage;
+}
+
+function swapStage() {
+  if (!state.scene) return;
+  state.scene.destroy();
+  state.scene = makeStage();
+  render();
+}
+
 function applyTheme() {
   const light = root.dataset.theme === 'light';
-  setSceneTheme(light);
+  setSceneTheme(light, prefs.room);
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', light ? '#f6efe2' : '#16132a');
   // icons are painted with the palette, so repaint them
   paintGears();
@@ -1146,6 +1174,28 @@ const SETTINGS = [
       state.scene?.setMotion(motionMode());
     },
   },
+  {
+    icon: () => 'house',
+    label: () => 'Room',
+    value: () => roomStyleName(prefs.room),
+    // cycles Office -> Cabin
+    toggle: () => {
+      prefs.room = ROOM_STYLE_IDS[(ROOM_STYLE_IDS.indexOf(prefs.room) + 1) % ROOM_STYLE_IDS.length];
+      saveRaw('sop.room', prefs.room);
+      applyTheme();
+    },
+  },
+  {
+    icon: () => 'grid',
+    label: () => 'Simple view',
+    note: '(for boring people)',
+    value: () => (prefs.simple ? 'On' : 'Off'),
+    toggle: () => {
+      prefs.simple = !prefs.simple;
+      saveRaw('sop.simple', prefs.simple ? '1' : '0');
+      swapStage();
+    },
+  },
 ];
 
 function iconCanvas(name) {
@@ -1171,7 +1221,9 @@ function renderSettingsMenu() {
     const b = el('button', 'menu-item');
     b.type = 'button';
     b.setAttribute('role', 'menuitem');
-    b.append(iconCanvas(item.icon()), el('span', 'menu-label', item.label()), el('span', 'menu-value', item.value()));
+    const lbl = el('span', 'menu-label', item.label());
+    if (item.note) lbl.append(' ', el('small', 'menu-note', item.note));
+    b.append(iconCanvas(item.icon()), lbl, el('span', 'menu-value', item.value()));
     b.onclick = () => {
       if (item.action) return item.toggle();
       item.toggle();

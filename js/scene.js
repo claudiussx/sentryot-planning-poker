@@ -12,6 +12,8 @@ const FIT_SCREEN = '(min-width: 1101px) and (min-height: 600px)';
 
 const CONFETTI = [PAL.teal, PAL.cyan, PAL.gold, PAL.red, PAL.pink, PAL.green, PAL.white];
 const SPOOKY_LIGHTS = ['#ff8a1f', '#9b5cff', '#7dff6a'];
+const WARM_LIGHTS = ['#ffd27a', '#ffb347', '#ffe9b0'];
+const CHALKBOARD = '#2e4a3b';
 // a tiny bat, wings up and wings down
 const BAT = [
   ['#...#', '.###.'],
@@ -267,22 +269,39 @@ export class Scene {
 
   drawWall(t) {
     const { ctx, LW } = this;
+    const cabin = SCENE.style === 'cabin';
     R(ctx, 0, 0, LW, WH, PAL.wall);
-    for (let x = 18; x < LW; x += 36) R(ctx, x, 0, 1, WH - 4, PAL.wallDark);
+    if (cabin) {
+      // stacked logs with a lit top edge, a dark seam and the odd knot
+      for (let y = 0, k = 0; y < WH - 4; y += 6, k++) {
+        R(ctx, 0, y, LW, 1, shade(PAL.wall, 0.08));
+        R(ctx, 0, y + 5, LW, 1, shade(PAL.wall, -0.3));
+        for (let x = 13 + ((k * 29) % 47); x < LW; x += 61) R(ctx, x, y + 2, 2, 1, shade(PAL.wall, -0.3));
+      }
+    } else {
+      for (let x = 18; x < LW; x += 36) R(ctx, x, 0, 1, WH - 4, PAL.wallDark);
+    }
     R(ctx, 0, WH - 4, LW, 4, PAL.border);
     R(ctx, 0, WH - 4, LW, 1, PAL.borderLight);
 
-    // floor
+    // floor: tiles in the office, staggered planks in the cabin
     R(ctx, 0, WH, LW, this.LH - WH, PAL.wallDark);
-    for (let y = WH + 12; y < this.LH; y += 16) R(ctx, 0, y, LW, 1, PAL.floorLine);
-    for (let x = 8; x < LW; x += 24) R(ctx, x, WH, 1, this.LH - WH, PAL.floorLine);
+    if (cabin) {
+      for (let y = WH + 8, k = 0; y < this.LH; y += 8, k++) {
+        R(ctx, 0, y, LW, 1, PAL.floorLine);
+        for (let x = (k * 23) % 48; x < LW; x += 48) R(ctx, x, y - 7, 1, 7, PAL.floorLine);
+      }
+    } else {
+      for (let y = WH + 12; y < this.LH; y += 16) R(ctx, 0, y, LW, 1, PAL.floorLine);
+      for (let x = 8; x < LW; x += 24) R(ctx, x, WH, 1, this.LH - WH, PAL.floorLine);
+    }
 
     // string lights
     for (let x = 4, i = 0; x < LW; x += 9, i++) {
       R(ctx, x, 3 + (i % 2), 3, 1, PAL.border);
       // minimal motion keeps only the lights, at a slower pace
       const on = Math.floor((this.calm ? t / 3.5 : t) / 600 + i) % 3 !== 0;
-      R(ctx, x + 1, 4 + (i % 2), 1, 2, on ? (this.halloween ? SPOOKY_LIGHTS[i % 3] : CONFETTI[i % 5]) : PAL.border);
+      R(ctx, x + 1, 4 + (i % 2), 1, 2, on ? (this.halloween ? SPOOKY_LIGHTS[i % 3] : cabin ? WARM_LIGHTS[i % 3] : CONFETTI[i % 5]) : PAL.border);
     }
 
     // window: a starry night in the dark theme, a sunny day in the light one (a still picture in minimal motion)
@@ -313,8 +332,9 @@ export class Scene {
         if (on) R(ctx, wx + 1 + Math.floor(s.x * (ww - 12)), wy + 1 + Math.floor(s.y * 14), 1, 1, s.x > 0.6 ? PAL.cyan : PAL.white);
       }
     }
-    // little skyline, lit windows at night
-    for (let x = 0, i = 0; x < ww; i++) {
+    // pine trees on a snowy hill for the cabin, a little skyline for the office
+    if (cabin) this.drawPines(wx, wy, ww);
+    for (let x = 0, i = 0; !cabin && x < ww; i++) {
       const bw = 4 + ((i * 7) % 5);
       const bh = 5 + ((i * 13) % 9);
       R(ctx, wx + x, wy + 26 - bh, Math.min(bw, ww - x), bh, PAL.skyline);
@@ -350,12 +370,14 @@ export class Scene {
     const mx = LW - mw - 8;
     if (mx > px + 26) {
       const steady = this.still || this.calm;
-      // shelf and feet
+      // shelf and feet (the cabin's chalkboard hangs on the wall instead)
       const wood = shade(PAL.plantPot, -0.08);
-      R(ctx, mx - 6, 35, mw + 12, 2, wood);
-      R(ctx, mx - 6, 35, mw + 12, 1, shade(wood, 0.12));
-      R(ctx, mx + 3, 33, 2, 2, PAL.ink);
-      R(ctx, mx + mw - 5, 33, 2, 2, PAL.ink);
+      if (!cabin) {
+        R(ctx, mx - 6, 35, mw + 12, 2, wood);
+        R(ctx, mx - 6, 35, mw + 12, 1, shade(wood, 0.12));
+        R(ctx, mx + 3, 33, 2, 2, PAL.ink);
+        R(ctx, mx + mw - 5, 33, 2, 2, PAL.ink);
+      }
       // bezel with rounded corners, a lit top edge and a darker bottom edge
       const bx = mx - 4;
       const bw = mw + 8;
@@ -363,15 +385,25 @@ export class Scene {
       R(ctx, bx, 7, bw, 25, PAL.border);
       R(ctx, bx + 1, 6, bw - 2, 1, PAL.borderLight);
       R(ctx, bx + 1, 32, bw - 2, 1, shade(PAL.border, -0.12));
-      // screen: dark glass, faint scanlines, a glint in the corner
-      R(ctx, mx - 1, 8, mw + 2, 22, PAL.ink);
-      R(ctx, mx, 9, mw, 20, PAL.screen);
-      for (let y = 10; y < 29; y += 2) R(ctx, mx, y, mw, 1, shade(PAL.screen, 0.035));
-      R(ctx, mx + 2, 10, 3, 1, shade(PAL.screen, 0.2));
-      R(ctx, mx + 2, 11, 1, 1, shade(PAL.screen, 0.2));
+      if (cabin) {
+        // chalkboard: green slate, smudges, a tray with a stick of chalk
+        R(ctx, mx - 1, 8, mw + 2, 22, shade(CHALKBOARD, -0.3));
+        R(ctx, mx, 9, mw, 20, CHALKBOARD);
+        R(ctx, mx + 4, 12, 7, 1, shade(CHALKBOARD, 0.08));
+        R(ctx, mx + mw - 12, 25, 8, 1, shade(CHALKBOARD, 0.08));
+        R(ctx, bx + 2, 33, bw - 4, 2, PAL.borderLight);
+        R(ctx, bx + 6, 32, 4, 1, '#f4f1e8');
+      } else {
+        // screen: dark glass, faint scanlines, a glint in the corner
+        R(ctx, mx - 1, 8, mw + 2, 22, PAL.ink);
+        R(ctx, mx, 9, mw, 20, PAL.screen);
+        for (let y = 10; y < 29; y += 2) R(ctx, mx, y, mw, 1, shade(PAL.screen, 0.035));
+        R(ctx, mx + 2, 10, 3, 1, shade(PAL.screen, 0.2));
+        R(ctx, mx + 2, 11, 1, 1, shade(PAL.screen, 0.2));
+      }
 
       let text;
-      let color = PAL.tealDark;
+      let color = cabin ? '#e9eee4' : PAL.tealDark;
       let showColon = true;
       let dimColon = false;
       let urgent = false;
@@ -379,7 +411,8 @@ export class Scene {
         const left = Math.max(0, Math.ceil((this.room.timerEnd - Date.now()) / 1000));
         text = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
         urgent = left <= 10;
-        color = urgent ? (steady || Math.floor(t / 250) % 2 ? PAL.red : shade(PAL.red, -0.35)) : PAL.teal;
+        const red = cabin ? '#ff9f8f' : PAL.red;
+        color = urgent ? (steady || Math.floor(t / 250) % 2 ? red : shade(red, -0.35)) : cabin ? '#e9eee4' : PAL.teal;
       } else {
         const d = new Date();
         text = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
@@ -397,21 +430,26 @@ export class Scene {
       const after = text.slice(i + 1);
       const colonX = x0 + textWidth(before, s) + s;
       const afterX = x0 + textWidth(`${before}:`, s) + s;
-      for (const [dx, ink] of [
-        [1, shade(color, -0.45)],
-        [0, color],
-      ]) {
+      // chalk has no glow: the cabin's digits skip the drop shadow
+      for (const [dx, ink] of cabin
+        ? [[0, color]]
+        : [
+            [1, shade(color, -0.45)],
+            [0, color],
+          ]) {
         drawText(ctx, before, x0 + dx, y0 + dx, ink, s);
         if (showColon) drawText(ctx, ':', colonX + dx, y0 + dx, dimColon ? shade(ink, -0.35) : ink, s);
         drawText(ctx, after, afterX + dx, y0 + dx, ink, s);
       }
       // power light: green, or blinking red in the last ten seconds of a timer
-      R(ctx, mx + mw + 1, 31, 1, 1, urgent && !steady && Math.floor(t / 250) % 2 ? shade(PAL.red, -0.3) : urgent ? PAL.red : PAL.green);
-      R(ctx, mx + mw / 2 - 2, 31, 4, 1, PAL.borderLight);
+      if (!cabin) R(ctx, mx + mw + 1, 31, 1, 1, urgent && !steady && Math.floor(t / 250) % 2 ? shade(PAL.red, -0.3) : urgent ? PAL.red : PAL.green);
+      if (!cabin) R(ctx, mx + mw / 2 - 2, 31, 4, 1, PAL.borderLight);
     }
 
-    // plant
-    if (LW > 230) {
+    // the cabin has a stone fireplace where the office keeps its plant
+    if (cabin && mx - 26 > px + 22) {
+      this.drawFireplace(t, mx - 26);
+    } else if (LW > 230) {
       const plx = mx > px + 26 ? mx - 18 : LW - 16;
       R(ctx, plx, WH - 10, 9, 7, PAL.plantPot);
       R(ctx, plx - 1, WH - 11, 11, 2, shade(PAL.plantPot, 0.08));
@@ -421,6 +459,48 @@ export class Scene {
       R(ctx, plx + 5 - sway, WH - 22, 4, 3, PAL.leaf);
       R(ctx, plx + 1, WH - 25, 4, 4, shade(PAL.leaf, 0.08));
     }
+  }
+
+  drawPines(wx, wy, ww) {
+    const { ctx } = this;
+    const snow = SCENE.light ? '#f4f8ff' : '#c9d3e6';
+    R(ctx, wx, wy + 23, ww, 3, snow);
+    for (let x = 1, i = 0; x < ww - 4; i++) {
+      const h = 7 + ((i * 5) % 6);
+      const base = wy + 23;
+      for (let r = 0; r < h; r++) {
+        const half = Math.floor(r / 2);
+        const left = Math.max(wx, wx + x + 3 - half);
+        const right = Math.min(wx + ww, wx + x + 4 + half);
+        if (right > left) R(ctx, left, base - h + r, right - left, 1, PAL.skyline);
+      }
+      R(ctx, wx + x + 3, base - h, 1, 1, snow);
+      x += 7 + (i % 3);
+    }
+  }
+
+  // stone fireplace standing on the floor line; the fire only dances in full motion
+  drawFireplace(t, x) {
+    const { ctx } = this;
+    const stone = SCENE.light ? '#8d8790' : '#5d5862';
+    const top = WH - 24;
+    R(ctx, x - 1, top - 2, 20, 3, PAL.borderLight);
+    R(ctx, x, top + 1, 18, 21, stone);
+    for (let y = top + 4, k = 0; y < WH - 3; y += 4, k++) {
+      R(ctx, x, y, 18, 1, shade(stone, -0.25));
+      for (let sx = x + (k % 2 ? 3 : 6); sx < x + 18; sx += 7) R(ctx, sx, y - 3, 1, 3, shade(stone, -0.25));
+    }
+    R(ctx, x + 4, top + 8, 10, 13, '#140c0a');
+    R(ctx, x + 5, WH - 6, 8, 2, '#6b3f22');
+    const f = this.calm || this.still ? 0 : Math.floor(t / 140) % 3;
+    const flame = [
+      [0, 0, 0],
+      [1, -1, 0],
+      [0, 1, -1],
+    ][f];
+    R(ctx, x + 6, WH - 9 + flame[0], 6, 3 - flame[0], '#ff8a1f');
+    R(ctx, x + 7, WH - 11 + flame[1], 4, 3, '#ffb347');
+    R(ctx, x + 8, WH - 13 + flame[2], 2, 3, '#ffe066');
   }
 
   // bats over the skyline and a cobweb in the top corner of the window

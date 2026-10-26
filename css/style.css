@@ -1916,3 +1916,187 @@ html:has(dialog[open]) {
     display: none;
   }
 }
+
+/* ---------- simple view (for boring people) ---------- */
+
+.menu-note {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.is-simple .hint {
+  visibility: hidden;
+}
+
+.simple {
+  width: 100%;
+  height: 100%;
+  min-height: 220px;
+  overflow: auto;
+  padding: 24px 16px 20px;
+  display: flex;
+  flex-wrap: wrap;
+  align-content: center;
+  justify-content: center;
+  gap: 22px 18px;
+  background: radial-gradient(ellipse at 50% 40%, var(--accent-15), transparent 70%), var(--sub);
+}
+
+.simple-seat {
+  position: relative;
+  width: 112px;
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+}
+
+.simple-seat.is-offline {
+  opacity: 0.5;
+}
+
+.simple-card {
+  width: 56px;
+  height: 80px;
+  margin: 4px 4px 12px;
+  display: grid;
+  place-items: center;
+  font-family: var(--font-display);
+  color: var(--ink);
+  background: var(--paper);
+  box-shadow:
+    0 -4px 0 0 var(--ink),
+    0 4px 0 0 var(--ink),
+    -4px 0 0 0 var(--ink),
+    4px 0 0 0 var(--ink),
+    inset 0 -6px 0 0 var(--paper-shade),
+    0 10px 0 0 var(--shadow);
+}
+
+/* no card yet: an empty slot on the table */
+.simple-card.is-empty {
+  background: transparent;
+  box-shadow: none;
+  outline: 4px dashed var(--border-light);
+  outline-offset: -4px;
+}
+
+/* picked, not shown: the card lies face down */
+.simple-card.is-down,
+.simple-card.is-waiting {
+  background: repeating-linear-gradient(45deg, var(--accent) 0 6px, var(--accent-active) 6px 12px);
+  box-shadow:
+    0 -4px 0 0 var(--ink),
+    0 4px 0 0 var(--ink),
+    -4px 0 0 0 var(--ink),
+    4px 0 0 0 var(--ink),
+    0 10px 0 0 var(--shadow);
+  animation: simple-drop 240ms steps(4);
+}
+
+.simple-card.is-up {
+  animation: simple-flip 320ms steps(4);
+}
+
+.simple-card.is-agree {
+  background: var(--accent);
+  box-shadow:
+    0 -4px 0 0 var(--ink),
+    0 4px 0 0 var(--ink),
+    -4px 0 0 0 var(--ink),
+    4px 0 0 0 var(--ink),
+    inset 0 -6px 0 0 var(--accent-active),
+    0 10px 0 0 var(--shadow),
+    0 0 24px 4px var(--accent-15);
+}
+
+.simple-card.is-watching {
+  background: var(--panel);
+  box-shadow:
+    0 -4px 0 0 var(--border-light),
+    0 4px 0 0 var(--border-light),
+    -4px 0 0 0 var(--border-light),
+    4px 0 0 0 var(--border-light);
+}
+
+@keyframes simple-drop {
+  from {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes simple-flip {
+  from {
+    transform: scaleX(0.1);
+  }
+}
+
+.simple-val {
+  font-size: 28px;
+}
+
+.simple-val.is-long {
+  font-size: 19px;
+}
+
+.simple-icon {
+  width: 36px;
+  height: 36px;
+  image-rendering: pixelated;
+}
+
+.simple-name {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  font-size: 15px;
+  color: var(--text);
+}
+
+.simple-seat.is-me .simple-name-text {
+  color: var(--gold-text);
+}
+
+.simple-name-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.simple-dot {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  box-shadow: 0 0 0 2px var(--ink);
+}
+
+.simple-host {
+  flex: none;
+  padding: 1px 4px;
+  font-size: 10px;
+  color: var(--ink);
+  background: var(--gold);
+}
+
+.simple-state {
+  font-size: 13px;
+  color: var(--secondary);
+}
+
+.simple-mark {
+  position: absolute;
+  top: -10px;
+  right: 6px;
+  width: 36px;
+  height: 36px;
+  padding: 4px;
+  image-rendering: pixelated;
+  background: var(--paper);
+  box-shadow:
+    0 -3px 0 0 var(--ink),
+    0 3px 0 0 var(--ink),
+    -3px 0 0 0 var(--ink),
+    3px 0 0 0 var(--ink);
+  animation: pop-in 200ms steps(3);
+}
