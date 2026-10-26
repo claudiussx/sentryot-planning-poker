@@ -8,11 +8,11 @@
     <meta name="theme-color" content="#16132a" />
     <meta name="referrer" content="no-referrer" />
     <!-- CSP_START: npm run bump rewrites the importmap hash -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'sha256-sKi6ICwJaU7/LDDERfW1+Snwxdh1jY9GP9TzQ2nihng='; style-src 'self'; font-src 'self'; img-src 'self' data:; connect-src wss://broker.hivemq.com:8884 wss://broker.emqx.io:8084 wss://test.mosquitto.org:8081; worker-src blob:; base-uri 'none'; form-action 'none'" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'sha256-ckrcrF6Wtle+ssoAgnXK1YW5edBNwKfrWVEOsx2FFEU='; style-src 'self'; font-src 'self'; img-src 'self' data:; connect-src wss://broker.hivemq.com:8884 wss://broker.emqx.io:8084 wss://test.mosquitto.org:8081; worker-src blob:; base-uri 'none'; form-action 'none'" />
     <!-- CSP_END -->
     <link rel="icon" type="image/svg+xml" href="assets/mark.svg" />
-    <link rel="stylesheet" href="css/style.css?v=17" />
-    <script src="js/boot.js?v=17"></script>
+    <link rel="stylesheet" href="css/style.css?v=20" />
+    <script src="js/boot.js?v=20"></script>
   </head>
   <body>
     <!-- ============ LOBBY ============ -->
@@ -130,6 +130,11 @@
             <ol id="chat-log" class="chat-log" aria-live="polite">
               <li class="chat-empty">Messages are only seen by the people in the room right now.</li>
             </ol>
+            <button type="button" id="chat-pill" class="chat-pill" hidden>
+              <span class="chat-pill-bubble" aria-hidden="true">...</span>
+              <span class="chat-pill-text">1 new message</span>
+              <span class="chat-pill-arrow" aria-hidden="true"></span>
+            </button>
             <form id="chat-form" class="chat-form" autocomplete="off">
               <input id="chat-input" maxlength="200" placeholder="Say something..." aria-label="Chat message" />
               <button type="submit" class="btn btn-primary btn-small">Send</button>
@@ -147,17 +152,17 @@
     <script type="importmap">
       {
         "imports": {
-          "./js/main.js": "./js/main.js?v=17",
-          "./js/net.js": "./js/net.js?v=17",
-          "./js/scene.js": "./js/scene.js?v=17",
-          "./js/sprites.js": "./js/sprites.js?v=17",
-          "./js/stats.js": "./js/stats.js?v=17",
-          "./js/audio.js": "./js/audio.js?v=17",
-          "./js/room-name.js": "./js/room-name.js?v=17",
-          "./vendor/mqtt.esm.js": "./vendor/mqtt.esm.js?v=17"
+          "./js/main.js": "./js/main.js?v=20",
+          "./js/net.js": "./js/net.js?v=20",
+          "./js/scene.js": "./js/scene.js?v=20",
+          "./js/sprites.js": "./js/sprites.js?v=20",
+          "./js/stats.js": "./js/stats.js?v=20",
+          "./js/audio.js": "./js/audio.js?v=20",
+          "./js/room-name.js": "./js/room-name.js?v=20",
+          "./vendor/mqtt.esm.js": "./vendor/mqtt.esm.js?v=20"
         }
       }
     </script>
-    <script type="module" src="js/main.js?v=17"></script>
+    <script type="module" src="js/main.js?v=20"></script>
   </body>
 </html>

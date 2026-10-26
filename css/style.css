@@ -54,6 +54,8 @@
   --toast-bg: #0d0b1a;
   --toast-text: #fff8ee;
   --shadow: #00000066;
+  --menu-bg: #0b0918;
+  --menu-hover: #221d3d;
   --tint: #4de0c014;
   --scanline: #ffffff05;
   --good-bg: #5ee27a22;
@@ -94,6 +96,8 @@
   --toast-bg: #241e3d;
   --toast-text: #fff8ee;
   --shadow: #3a326640;
+  --menu-bg: #e6dbc6;
+  --menu-hover: #d9ccb3;
   --tint: #f2b41726;
   --scanline: #3a326608;
   --good-bg: #2fae5522;
@@ -1441,6 +1445,95 @@ input::placeholder {
   font-size: 14px;
 }
 
+/* a gentle "you have mail" pill that floats just above the message box */
+.chat-panel {
+  position: relative;
+}
+
+.chat-pill {
+  position: absolute;
+  left: 50%;
+  bottom: 62px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px 5px 6px;
+  border: 0;
+  background: var(--accent);
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+  transform: translateX(-50%);
+  box-shadow:
+    0 0 0 3px var(--ink),
+    0 6px 0 3px var(--shadow);
+  animation: pill-bob 1.4s steps(2) infinite;
+}
+
+.chat-pill:focus-visible {
+  outline: 2px dashed var(--accent-2);
+  outline-offset: 6px;
+}
+
+.chat-pill-bubble {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 18px;
+  background: var(--paper);
+  color: var(--ink);
+  font-weight: 800;
+  line-height: 1;
+  box-shadow: 0 0 0 2px var(--ink);
+}
+
+/* a pixel arrow pointing down */
+.chat-pill-arrow {
+  width: 10px;
+  height: 10px;
+  background: var(--ink);
+  clip-path: polygon(30% 0, 70% 0, 70% 40%, 100% 40%, 50% 100%, 0 40%, 30% 40%);
+}
+
+@keyframes pill-bob {
+  50% {
+    transform: translateX(-50%) translateY(-3px);
+  }
+}
+
+:root[data-motion='minimal'] .chat-pill {
+  animation-duration: 2.8s;
+}
+
+.chat-divider {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--accent);
+  font-family: var(--font-display);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.chat-divider::before,
+.chat-divider::after {
+  content: '';
+  flex: 1;
+  height: 2px;
+  background: var(--accent);
+  opacity: 0.6;
+}
+
+:root[data-font='normal'] .chat-divider {
+  font-size: 11px;
+  font-weight: 800;
+}
+
 .chat-form {
   display: flex;
   align-items: center;
@@ -1469,6 +1562,20 @@ input::placeholder {
   padding: 6px;
   display: grid;
   gap: 4px;
+  /* darker than the page and outlined brighter, so it never blends into what is behind it */
+  background: var(--menu-bg);
+  box-shadow:
+    0 -4px 0 0 var(--border-light),
+    0 4px 0 0 var(--border-light),
+    -4px 0 0 0 var(--border-light),
+    4px 0 0 0 var(--border-light),
+    0 12px 0 0 var(--shadow),
+    0 16px 32px var(--shadow);
+}
+
+.settings-menu .menu-item:hover,
+.settings-menu .menu-item:focus-visible {
+  background: var(--menu-hover);
 }
 
 .menu-item {

@@ -88,6 +88,12 @@ export class Scene {
     this.room = { ...room };
   }
 
+  // typing lasts until told otherwise, but never longer than this without a refresh
+  setTyping(id, on) {
+    const a = this.anim.get(id);
+    if (a) a.typingUntil = on ? performance.now() + 7000 : 0;
+  }
+
   emote(id, icon) {
     const a = this.anim.get(id);
     if (!a) return;
@@ -99,12 +105,7 @@ export class Scene {
     const from = this.seats.get(fromId);
     const to = this.seats.get(toId);
     if (!from || !to) return;
-    // without motion the ball lands at once: the target just shows the "!" bubble
-    if (this.still) {
-      const a = this.anim.get(toId);
-      if (a) a.hitT = performance.now();
-      return;
-    }
+    // paper balls fly in every motion setting: it is the one thing people throw on purpose
     this.balls.push({ fx: from.cx + 6, fy: from.dy - 14, tx: to.cx, ty: to.dy - 20, start: performance.now(), dur: 700, toId });
   }
 
@@ -236,10 +237,7 @@ export class Scene {
     const still = mode === 'off';
     this.still = still;
     this.calm = mode === 'minimal';
-    if (still) {
-      this.particles = [];
-      this.balls = [];
-    }
+    if (still) this.particles = [];
   }
 
   loop(t) {
@@ -446,6 +444,8 @@ export class Scene {
 
     let bubble = null;
     if (a.emote && now < a.emoteUntil) bubble = a.emote;
+    // the dots fill in one by one while someone types; steady when motion is reduced
+    else if (a.typingUntil > now) bubble = still || calm ? 'talk' : ['talk1', 'talk2', 'talk'][Math.floor(t / 350) % 3];
     else if (hit < 650) bubble = 'bang';
     else if (pose === 'away') bubble = 'zzz';
     else if (pose === 'shrug') bubble = 'question';

@@ -214,7 +214,10 @@ const ICONS = {
   angry: ['.#####.', '#k###k#', '##k#k##', '#######', '##kkk##', '#k###k#', '.#####.'],
   skull: ['.#####.', '#######', '#..#..#', '#..#..#', '###.###', '.#####.', '.#.#.#.'],
   ghost: ['..###..', '.#####.', '#k##k##', '#######', '#######', '#######', '#.#.#.#'],
-  talk: ['#.#.#'], // "..." over someone who just wrote in the chat
+  // "..." over someone typing in the chat; ',' is an invisible pixel that keeps the width steady
+  talk: ['#.#.#'],
+  talk1: ['#,,,,'],
+  talk2: ['#,#,,'],
   // settings menu
   gear: ['..#.#..', '.#####.', '###.###', '.#...#.', '###.###', '.#####.', '..#.#..'],
   speaker: ['...#...', '..##.#.', '####..#', '####..#', '####..#', '..##.#.', '...#...'],
@@ -250,6 +253,8 @@ const ICON_COLORS = {
   skull: 'secondary',
   ghost: '#b9a8ff',
   talk: 'ink',
+  talk1: 'ink',
+  talk2: 'ink',
   gear: 'value',
   speaker: 'value',
   muted: 'value',

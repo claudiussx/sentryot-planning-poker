@@ -84,6 +84,7 @@ const state = {
   scene: null,
   lastThrow: 0,
   recentlyGone: new Map(),
+  chatUnread: 0,
   eventLog: new Map(), // sender id -> recent event times, for the flood limit
   skey: null, // storage key for this room
 };
@@ -576,8 +577,9 @@ function onEvent(e) {
     const text = cleanChat(e.text);
     if (!text) return;
     addChat(state.peers.get(e.from), text);
-    state.scene.emote(e.from, 'talk');
     play('emote');
+  } else if (e.type === 'typing') {
+    state.scene.setTyping(e.from, e.on === true);
   }
 }
 
@@ -698,16 +700,38 @@ function sendChat(raw) {
   const text = cleanChat(raw);
   if (!text || !state.rc) return;
   addChat({ ...state.me, isMe: true }, text);
-  state.scene.emote(state.me.id, 'talk');
   state.rc.sendEvent({ type: 'chat', from: state.me.id, text });
+}
+
+// "..." over your character while your message box is focused. Re-sent every few
+// seconds so latecomers see it, and it fades by itself if the "stopped" message is lost.
+const TYPING_REFRESH_MS = 4000;
+
+function setTyping(on) {
+  clearInterval(state.typingTimer);
+  if (on) state.typingTimer = setInterval(() => announceTyping(true), TYPING_REFRESH_MS);
+  if (state.typing === on) return;
+  state.typing = on;
+  announceTyping(on);
+}
+
+function announceTyping(on) {
+  if (!state.rc) return;
+  state.scene.setTyping(state.me.id, on);
+  state.rc.sendEvent({ type: 'typing', from: state.me.id, on });
+}
+
+function chatAtBottom(log = $('#chat-log')) {
+  return log.scrollHeight - log.scrollTop - log.clientHeight < 40;
 }
 
 function addChat(who, text) {
   if (!who) return;
   const log = $('#chat-log');
   log.querySelector('.chat-empty')?.remove();
-  // stay at the bottom only if the reader already was there
-  const atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
+  // follow the conversation only while someone is actually watching it at the bottom
+  const follow = who.isMe || (chatAtBottom(log) && !document.hidden && !state.chatUnread);
+  if (!follow && !state.chatUnread) log.append(el('li', 'chat-divider', 'new'));
   const li = el('li', `chat-msg${who.isMe ? ' is-me' : ''}`);
   const dot = el('span', 'p-dot');
   dot.style.background = SHIRTS[who.look?.shirt ?? 0];
@@ -720,7 +744,49 @@ function addChat(who, text) {
   );
   log.append(li);
   while (log.children.length > MAX_CHAT) log.firstElementChild.remove();
-  if (atBottom || who.isMe) log.scrollTop = log.scrollHeight;
+  if (follow) {
+    clearChatUnread();
+    log.scrollTop = log.scrollHeight;
+  } else {
+    state.chatUnread += 1;
+    renderChatPill();
+  }
+}
+
+function renderChatPill() {
+  const pill = $('#chat-pill');
+  const n = state.chatUnread;
+  pill.hidden = !n;
+  pill.querySelector('.chat-pill-text').textContent = n === 1 ? '1 new message' : `${n} new messages`;
+  renderTitle();
+}
+
+function clearChatUnread() {
+  if (!state.chatUnread) return;
+  state.chatUnread = 0;
+  renderChatPill();
+  // the divider stays a moment so you can see where you left off
+  setTimeout(() => {
+    if (!state.chatUnread) $('#chat-log').querySelector('.chat-divider')?.remove();
+  }, 2500);
+}
+
+function jumpToLatestChat() {
+  const log = $('#chat-log');
+  const divider = log.querySelector('.chat-divider');
+  // land on the first unread line, or the very bottom if it is all on screen
+  log.scrollTop = divider ? Math.min(divider.offsetTop - log.offsetTop - 8, log.scrollHeight) : log.scrollHeight;
+  if (chatAtBottom(log) || !divider) {
+    log.scrollTop = log.scrollHeight;
+    clearChatUnread();
+  }
+  $('#chat-input').focus();
+}
+
+// a background tab shows the unread count in its title
+function renderTitle() {
+  const base = `${state.room?.name || 'Planning'} · Pixel Poker`;
+  document.title = state.chatUnread ? `(${state.chatUnread}) ${base}` : base;
 }
 
 function sendEmote(icon) {
@@ -809,6 +875,12 @@ function wireRoomControls() {
   $('#leave').onclick = leaveRoom;
   $('#reveal').onclick = reveal;
   $('#next').onclick = nextRound;
+  $('#chat-pill').onclick = jumpToLatestChat;
+  $('#chat-input').addEventListener('focus', () => setTyping(true));
+  $('#chat-input').addEventListener('blur', () => setTyping(false));
+  $('#chat-log').addEventListener('scroll', () => {
+    if (chatAtBottom()) clearChatUnread();
+  });
   $('#chat-form').onsubmit = (e) => {
     e.preventDefault();
     sendChat($('#chat-input').value);
@@ -1030,7 +1102,7 @@ function render() {
   const host = amHost();
 
   $('#room-title').textContent = room?.name || 'Planning room';
-  document.title = `${room?.name || 'Planning'} · Pixel Poker`;
+  renderTitle();
   $('#round-no').textContent = room?.round ?? '-';
   renderStatus();
 
