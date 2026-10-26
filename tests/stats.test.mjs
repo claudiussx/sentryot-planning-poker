@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { computeStats, nearestDeckValue, label } from '../js/stats.js';
+import { computeStats, nearestDeckValue, label, formatScale, ALL_CARDS, deckOf } from '../js/stats.js';
 
 const v = (...votes) => votes.map((vote, i) => ({ id: String(i), name: `P${i}`, vote }));
 
@@ -65,4 +65,30 @@ test('nearest deck value rounds ties up', () => {
 test('labels', () => {
   assert.equal(label('0.5'), '0.5');
   assert.equal(label('13'), '13');
+});
+
+test('t-shirt sizes: stats by position, shown as sizes', () => {
+  const s = computeStats(v('S', 'M', 'L', '?'), 'tshirt');
+  assert.equal(s.total, 4);
+  assert.equal(s.numericCount, 3);
+  assert.equal(formatScale('tshirt', s.average), 'M');
+  assert.equal(formatScale('tshirt', s.suggested), 'M');
+  assert.equal(formatScale('tshirt', s.min), 'S');
+  assert.equal(formatScale('tshirt', s.max), 'L');
+  assert.equal(s.spread, null);
+  assert.ok(computeStats(v('XS', 'XL'), 'tshirt').spread);
+});
+
+test('hours: numbers in hours, cards from other decks ignored', () => {
+  const s = computeStats(v('4h', '8h', '5'), 'hours');
+  assert.equal(s.total, 2);
+  assert.equal(s.average, 6);
+  assert.equal(formatScale('hours', s.suggested), '8h');
+  assert.equal(computeStats(v('M', '5'), 'fib').total, 1);
+});
+
+test('every card of every deck is a valid vote, nothing else', () => {
+  assert.ok(ALL_CARDS.has('XXL') && ALL_CARDS.has('40h') && ALL_CARDS.has('0.5') && ALL_CARDS.has('coffee'));
+  assert.ok(!ALL_CARDS.has('0') && !ALL_CARDS.has('banana'));
+  assert.equal(deckOf('nope').id, 'fib');
 });

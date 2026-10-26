@@ -8,11 +8,11 @@
     <meta name="theme-color" content="#16132a" />
     <meta name="referrer" content="no-referrer" />
     <!-- CSP_START: npm run bump rewrites the importmap hash -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'sha256-mLkV5JfM4IoU9/Cddpi13hIjpwy94WVXCbbUrthr6T4='; style-src 'self'; font-src 'self'; img-src 'self' data:; connect-src wss://broker.hivemq.com:8884 wss://broker.emqx.io:8084 wss://test.mosquitto.org:8081; worker-src blob:; base-uri 'none'; form-action 'none'" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'sha256-MxXrqQfZntvg9jhgGM1rDifQy6RqulRjKbFxJcOFQI4='; style-src 'self'; font-src 'self'; img-src 'self' data:; connect-src wss://broker.hivemq.com:8884 wss://broker.emqx.io:8084 wss://test.mosquitto.org:8081; worker-src blob:; base-uri 'none'; form-action 'none'" />
     <!-- CSP_END -->
     <link rel="icon" type="image/svg+xml" href="assets/mark.svg" />
-    <link rel="stylesheet" href="css/style.css?v=38" />
-    <script src="js/boot.js?v=38"></script>
+    <link rel="stylesheet" href="css/style.css?v=40" />
+    <script src="js/boot.js?v=40"></script>
   </head>
   <body>
     <!-- ============ LOBBY ============ -->
@@ -71,6 +71,7 @@
         <div class="topbar-actions">
           <span id="conn" class="conn" title="Connection"></span>
           <button type="button" class="btn btn-primary" id="invite">Copy invite link</button>
+          <button type="button" class="btn" id="qr" title="Show a QR code to join from a phone" aria-expanded="false" aria-controls="qr-pop">QR</button>
           <button type="button" class="btn btn-icon settings-btn" aria-label="Settings" title="Settings" aria-haspopup="menu" aria-expanded="false"></button>
           <button type="button" class="btn" id="leave">Leave</button>
         </div>
@@ -82,6 +83,7 @@
             <div class="round-info">
               <span class="round-chip">Round <b id="round-no">1</b></span>
               <span class="host-chip" id="host-chip" hidden>You host</span>
+              <span class="revote-chip" id="revote-chip" hidden>Re-vote</span>
             </div>
             <div class="round-right">
               <div class="status-line" id="status-line"></div>
@@ -95,13 +97,10 @@
                     <button type="button" class="btn btn-small" data-timer="120">2m</button>
                     <button type="button" class="btn btn-small" data-timer="0">Off</button>
                   </div>
-                  <label class="check check-small">
-                    <input type="checkbox" id="auto-reveal" />
-                    <span class="check-box" aria-hidden="true"></span>
-                    <span>Auto-show when all voted</span>
-                  </label>
                 </div>
+                <button type="button" class="btn" id="poke" title="Nudge everyone who has not voted yet" hidden>Poke</button>
                 <button type="button" class="btn btn-primary" id="reveal">Show votes</button>
+                <button type="button" class="btn" id="revote" title="Same round, everyone votes again" hidden>Re-vote</button>
                 <button type="button" class="btn btn-primary" id="next" hidden>New round</button>
               </div>
             </div>
@@ -149,22 +148,51 @@
     <div id="settings-menu" class="settings-menu pixel-box" role="menu" aria-label="Settings" hidden></div>
     <div id="toasts" class="toasts" aria-live="polite"></div>
 
+    <div id="qr-pop" class="qr-pop pixel-box" hidden>
+      <canvas id="qr-canvas" class="qr-canvas" width="33" height="33" aria-label="QR code of the invite link"></canvas>
+      <p>Scan to join from a phone</p>
+    </div>
+
+    <dialog id="recap" class="recap pixel-box" aria-labelledby="recap-title">
+      <header class="recap-head">
+        <img src="assets/mark.svg" alt="" width="40" height="40" />
+        <div>
+          <h2 id="recap-title">Session recap</h2>
+          <p id="recap-room" class="recap-room"></p>
+        </div>
+      </header>
+      <div id="recap-tiles" class="recap-tiles"></div>
+      <ul id="recap-awards" class="recap-awards"></ul>
+      <div id="recap-rounds-wrap">
+        <h3>Rounds</h3>
+        <ol id="recap-rounds" class="recap-rounds"></ol>
+      </div>
+      <p class="recap-foot">From the reveals this browser saw.</p>
+      <div class="recap-actions">
+        <button type="button" class="btn" id="recap-copy">Copy as text</button>
+        <button type="button" class="btn btn-primary" id="recap-close">Close</button>
+      </div>
+    </dialog>
+
     <!-- GitHub Pages caches files for 10 minutes: every file URL carries the release version
          (npm run bump) so a deploy never mixes old and new modules -->
     <script type="importmap">
       {
         "imports": {
-          "./js/main.js": "./js/main.js?v=38",
-          "./js/net.js": "./js/net.js?v=38",
-          "./js/scene.js": "./js/scene.js?v=38",
-          "./js/sprites.js": "./js/sprites.js?v=38",
-          "./js/stats.js": "./js/stats.js?v=38",
-          "./js/audio.js": "./js/audio.js?v=38",
-          "./js/room-name.js": "./js/room-name.js?v=38",
-          "./vendor/mqtt.esm.js": "./vendor/mqtt.esm.js?v=38"
+          "./js/main.js": "./js/main.js?v=40",
+          "./js/net.js": "./js/net.js?v=40",
+          "./js/scene.js": "./js/scene.js?v=40",
+          "./js/sprites.js": "./js/sprites.js?v=40",
+          "./js/stats.js": "./js/stats.js?v=40",
+          "./js/audio.js": "./js/audio.js?v=40",
+          "./js/room-name.js": "./js/room-name.js?v=40",
+          "./js/season.js": "./js/season.js?v=40",
+          "./js/recap.js": "./js/recap.js?v=40",
+          "./vendor/mqtt.esm.js": "./vendor/mqtt.esm.js?v=40",
+          "./vendor/qrcode.mjs": "./vendor/qrcode.mjs?v=40"
         }
       }
     </script>
-    <script type="module" src="js/main.js?v=38"></script>
+    <script type="module" src="js/main.js?v=40"></script>
   </body>
 </html>

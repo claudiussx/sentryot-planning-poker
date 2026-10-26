@@ -41,6 +41,7 @@ const SOUNDS = {
   hit: () => tone(160, 0, 0.12, { type: 'square', vol: 0.05, slide: -80 }),
   tick: () => tone(1200, 0, 0.03, { vol: 0.02 }),
   emote: () => tone(1046, 0, 0.06, { type: 'triangle', vol: 0.05 }),
+  poke: () => [1318, 1568, 1318].forEach((f, i) => tone(f, i * 0.09, 0.08, { type: 'square', vol: 0.05 })),
 };
 
 export function play(name) {

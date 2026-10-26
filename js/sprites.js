@@ -163,6 +163,7 @@ export function randomLook(seed = Math.random() * 1e9) {
     acc: pick(ACCESSORIES.length),
     // about half the new characters come with a logo
     decal: r() < 0.5 ? 0 : 1 + pick(DECALS.length - 1),
+    pet: r() < 0.6 ? 0 : 1 + pick(PETS.length - 1),
   };
 }
 
@@ -176,7 +177,48 @@ export function sanitizeLook(l) {
     shirt: clamp(l.shirt, SHIRTS.length),
     acc: clamp(l.acc, ACCESSORIES.length),
     decal: clamp(l.decal, DECALS.length),
+    pet: clamp(l.pet, PETS.length),
   };
+}
+
+// ---------- desk pets: a little friend on the desk, left of the paper ----------
+
+export const PETS = [
+  { name: 'No pet' },
+  { name: 'Duck', px: ['.yyy...', 'oyky...', '.yyy..y', '.yyYYyy', '..yyyy.'] },
+  { name: 'Cat', px: ['n...n..', 'nnnnn..', 'nknkn..', 'nnpnn.n', '.nNn..n', '.nnnnn.'] },
+  { name: 'Cactus', px: ['..p..', '..g..', 'g.g.g', 'ggggg', '..g..', 'bbbbb', '.bbb.'] },
+  { name: 'Slime', px: ['.sss.', 'sswss', 'sksks', 'sssss', 'SSSSS'] },
+  { name: 'Ghostie', px: ['.www.', 'wwwww', 'wkwkw', 'wwwww', 'w.w.w'] },
+  { name: 'Frog', px: ['gk.kg', 'ggggg', 'gpppg', '.ggg.', 'G...G'] },
+];
+const PET_INKS = { y: '#ffd84d', Y: '#e0a92a', o: '#ff9a3d', k: '#1b1730', n: '#b8b2cc', N: '#7a72a8', p: '#ff8fb1', g: '#5ee27a', G: '#2b9a52', b: '#9a5b3a', s: '#4de0c0', S: '#2bb597', w: '#f7f3ff' };
+
+// x: left edge, base: the desk row the pet stands on (its bottom pixel row)
+export function drawPet(ctx, x, base, pet) {
+  const px = PETS[pet]?.px;
+  if (!px) return;
+  const top = base - px.length + 1;
+  px.forEach((row, y) => {
+    for (let i = 0; i < row.length; i++) {
+      const ink = PET_INKS[row[i]];
+      if (ink) R(ctx, x + i, top + y, 1, 1, ink);
+    }
+  });
+}
+
+// ---------- Halloween props ----------
+
+const PUMPKIN = ['...d...', '.ooooo.', 'oyoooyo', 'ooooooo', 'ooyyyoo', '.ooooo.'];
+
+// a jack-o'-lantern standing on the desk; the carved face glows at night
+export function drawPumpkin(ctx, x, base, flicker = false) {
+  const glow = SCENE.light ? '#7a3a10' : flicker ? '#ffb020' : '#ffe066';
+  const inks = { d: '#2b9a52', o: '#ff8a1f', y: glow };
+  const top = base - PUMPKIN.length + 1;
+  PUMPKIN.forEach((row, y) => {
+    for (let i = 0; i < row.length; i++) if (inks[row[i]]) R(ctx, x + i, top + y, 1, 1, inks[row[i]]);
+  });
 }
 
 export function shade(hex, amt) {
@@ -213,6 +255,12 @@ const GLYPHS = {
   ':': '000010000010000',
   '!': '010010010000010',
   ' ': '000000000000000',
+  // letters for the t-shirt and hour cards
+  X: '101101010101101',
+  S: '011100010001110',
+  M: '101111111101101',
+  L: '100100100100111',
+  h: '100100111101101',
 };
 
 export function textWidth(text, s = 1) {
@@ -836,6 +884,7 @@ export function drawPreview(canvas, look, t, pose = 'idle', k = 0) {
   const dy = canvas.height - 12;
   drawChair(ctx, cx, dy);
   drawDesk(ctx, -1, dy, canvas.width + 2);
+  drawPet(ctx, cx - 18, dy + 5, look.pet);
   const bob = pose === 'reveal' && k > 300 && k < 450 ? -2 : Math.floor(t / 600) % 2 ? 0 : -1;
   drawCharacter(ctx, {
     cx,

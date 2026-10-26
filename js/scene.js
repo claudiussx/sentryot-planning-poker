@@ -1,6 +1,7 @@
 // The planning room: wall, desks, characters and effects on one low-res canvas,
 // with a DOM overlay for crisp name plates and click targets.
-import { PAL, R, drawCharacter, drawChair, drawDesk, drawMark, drawText, SCENE, textWidth, drawIcon, drawEmoteBubble, drawBadgeCheck, seedOf, rng, shade } from './sprites.js';
+import { PAL, R, drawCharacter, drawChair, drawDesk, drawMark, drawText, SCENE, textWidth, drawIcon, drawEmoteBubble, drawBadgeCheck, seedOf, rng, shade, drawPet, drawPumpkin } from './sprites.js';
+import { seasonFor } from './season.js';
 
 const SW = 46; // seat width
 const WH = 50; // wall height
@@ -10,6 +11,14 @@ const FIRST_DESK = WH + 22;
 const FIT_SCREEN = '(min-width: 1101px) and (min-height: 600px)';
 
 const CONFETTI = [PAL.teal, PAL.cyan, PAL.gold, PAL.red, PAL.pink, PAL.green, PAL.white];
+const SPOOKY_LIGHTS = ['#ff8a1f', '#9b5cff', '#7dff6a'];
+// a tiny bat, wings up and wings down
+const BAT = [
+  ['#...#', '.###.'],
+  ['.###.', '#...#'],
+];
+// a corner cobweb, as pixel offsets from the corner
+const WEB = [[0, 0], [1, 1], [2, 2], [3, 3], [4, 4], [5, 5], [3, 0], [3, 1], [2, 3], [1, 3], [0, 3], [6, 0], [6, 1], [5, 3], [4, 5], [3, 5], [1, 6], [0, 6], [2, 1], [1, 2], [4, 2], [2, 4]];
 
 export class Scene {
   constructor(host, { onSeatClick } = {}) {
@@ -29,6 +38,7 @@ export class Scene {
     this.room = { revealed: false, consensus: false, timerEnd: null };
     this.still = false;
     this.calm = false;
+    this.halloween = seasonFor(new Date(), location.search) === 'halloween';
     this.stars = Array.from({ length: 14 }, (_, i) => {
       const r = rng(i + 11);
       return { x: r(), y: r(), p: r() * 3000 };
@@ -86,6 +96,15 @@ export class Scene {
     }
     if (room.consensus && !this.room.consensus) setTimeout(() => this.confetti(), 300 + this.players.length * 130);
     this.room = { ...room };
+  }
+
+  // the host nudged these people: a hop and a "!" over their heads
+  poke(ids) {
+    const now = performance.now();
+    for (const id of ids) {
+      const a = this.anim.get(id);
+      if (a) a.pokeT = now;
+    }
   }
 
   // typing lasts until told otherwise, but never longer than this without a refresh
@@ -263,7 +282,7 @@ export class Scene {
       R(ctx, x, 3 + (i % 2), 3, 1, PAL.border);
       // minimal motion keeps only the lights, at a slower pace
       const on = Math.floor((this.calm ? t / 3.5 : t) / 600 + i) % 3 !== 0;
-      R(ctx, x + 1, 4 + (i % 2), 1, 2, on ? CONFETTI[i % 5] : PAL.border);
+      R(ctx, x + 1, 4 + (i % 2), 1, 2, on ? (this.halloween ? SPOOKY_LIGHTS[i % 3] : CONFETTI[i % 5]) : PAL.border);
     }
 
     // window: a starry night in the dark theme, a sunny day in the light one (a still picture in minimal motion)
@@ -287,7 +306,7 @@ export class Scene {
         R(ctx, Math.max(wx, cx + 2), wy + cy - 1, Math.max(0, Math.min(4, wx + ww - cx - 2)), 1, PAL.white);
       }
     } else {
-      R(ctx, wx + ww - 9, wy + 4, 5, 5, PAL.moon);
+      R(ctx, wx + ww - 9, wy + 4, 5, 5, this.halloween ? '#ffad42' : PAL.moon);
       R(ctx, wx + ww - 8, wy + 4, 2, 2, PAL.sky);
       for (const s of this.stars) {
         const on = (tw + s.p) % 3000 > 400;
@@ -302,12 +321,25 @@ export class Scene {
       if (i % 2 && !SCENE.light) R(ctx, wx + x + 1, wy + 26 - bh + 2, 1, 1, PAL.gold);
       x += bw + 1;
     }
+    if (this.halloween) this.drawSpookyWindow(tw, wx, wy, ww);
     R(ctx, wx + Math.floor(ww / 2), wy, 1, 26, PAL.border);
     R(ctx, wx, wy + 13, ww, 1, PAL.border);
     R(ctx, wx - 3, wy + 26, ww + 6, 2, PAL.borderLight);
 
     // poster of the game's card
     const px = Math.floor(LW / 2) - 10;
+    // a spider on its thread between the window and the poster, bobbing slowly in full motion
+    const gapL = wx + ww + 3;
+    if (this.halloween && px - 2 - gapL >= 7) {
+      const sx = Math.floor((gapL + px - 2) / 2);
+      const sy = 14 + (this.calm ? 0 : Math.round(3 * Math.sin(t / 900)));
+      R(ctx, sx, 0, 1, sy, SCENE.light ? PAL.muted : PAL.secondary);
+      const leg = SCENE.light ? PAL.ink : '#0a0814';
+      R(ctx, sx - 1, sy, 3, 2, leg);
+      for (const [dx, dy] of [[-2, -1], [2, -1], [-3, 0], [3, 0], [-2, 2], [2, 2], [-3, 3], [3, 3]]) R(ctx, sx + dx, sy + dy, 1, 1, leg);
+      R(ctx, sx - 1, sy + 1, 1, 1, PAL.red);
+      R(ctx, sx + 1, sy + 1, 1, 1, PAL.red);
+    }
     R(ctx, px - 1, 7, 22, 26, PAL.ink);
     R(ctx, px, 8, 20, 24, PAL.panel);
     drawMark(ctx, px + 1, 9);
@@ -391,6 +423,24 @@ export class Scene {
     }
   }
 
+  // bats over the skyline and a cobweb in the top corner of the window
+  drawSpookyWindow(t, wx, wy, ww) {
+    const { ctx } = this;
+    const web = SCENE.light ? PAL.white : PAL.muted;
+    for (const [x, y] of WEB) R(ctx, wx + x, wy + y, 1, 1, web);
+    const ink = SCENE.light ? '#3a2f5c' : '#7b5cc4';
+    for (let i = 0; i < 3; i++) {
+      const span = ww - 14;
+      // full motion: they flap across; otherwise they hang in the sky where they are
+      const x = wx + 8 + (this.calm || this.still ? Math.floor(((i * 37) % 100) / 100 * span) : Math.floor((t / 60 + i * 19) % span));
+      const y = wy + 3 + ((i * 5) % 8) + (this.calm || this.still ? 0 : Math.round(Math.sin(t / 400 + i * 2)));
+      const frame = BAT[this.calm || this.still ? 0 : Math.floor(t / 160 + i) % 2];
+      frame.forEach((row, ry) => {
+        for (let rx = 0; rx < row.length; rx++) if (row[rx] === '#') R(ctx, x + rx, y + ry, 1, 1, ink);
+      });
+    }
+  }
+
   draw(t) {
     const { ctx } = this;
     const now = performance.now();
@@ -403,6 +453,12 @@ export class Scene {
     for (const row of this.rows) {
       for (const p of row.members) drawChair(ctx, this.seats.get(p.id).cx, row.dy);
       drawDesk(ctx, row.x0 - 4, row.dy, row.w + 8);
+      if (this.halloween) {
+        // jack-o'-lanterns at both ends of every desk; the glow flickers now and then in full motion
+        const flick = (k) => !this.calm && !this.still && (t + k * 977) % 2300 < 140;
+        drawPumpkin(ctx, row.x0 - 4, row.dy + 5, flick(row.dy));
+        drawPumpkin(ctx, row.x0 + row.w - 3, row.dy + 5, flick(row.dy + 1));
+      }
       row.members.forEach((p, i) => this.drawPlayer(p, i, t, now, revealed, consensus));
     }
 
@@ -445,11 +501,16 @@ export class Scene {
     else pose = 'think';
 
     const hit = now - a.hitT;
+    const poked = now - (a.pokeT || -1e9);
+    if (poked < 1400 && !still) bob -= poked < 160 ? 3 : poked < 320 ? 1 : 0;
     let shake = 0;
     if (hit < 650) {
       shake = still ? 0 : Math.floor(hit / 60) % 2 ? 1 : -1;
       face.mouth = 'o';
     }
+
+    // the desk pet stands next to the paper and hops along when its owner cheers
+    drawPet(ctx, cx - 18, dy + 5 + (pose === 'cheer' ? Math.min(0, Math.round(bob / 2)) : 0), p.look.pet);
 
     const scribble = pose === 'scribble' ? (now - a.scribbleStart) / 1300 : 0;
     const paperFace = pose === 'voted' ? 'down' : 'up';
@@ -478,6 +539,7 @@ export class Scene {
 
     let bubble = null;
     if (a.emote && now < a.emoteUntil) bubble = a.emote;
+    else if (poked < 1400) bubble = 'bang';
     // the dots fill in one by one while someone types; steady when motion is reduced
     else if (a.typingUntil > now) bubble = still || calm ? 'talk' : ['talk1', 'talk2', 'talk'][Math.floor(t / 350) % 3];
     else if (hit < 650) bubble = 'bang';

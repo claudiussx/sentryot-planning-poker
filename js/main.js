@@ -1,7 +1,9 @@
 import { RoomClient, newToken, newId } from './net.js';
 import { Scene } from './scene.js';
-import { randomLook, sanitizeLook, drawPreview, drawIconCentered, setSceneTheme, EMOTES, EMOTE_NAMES, SHIRTS, HAIR_STYLES, HAIR_COLORS, SKINS, ACCESSORIES, DECALS } from './sprites.js';
-import { DECK, computeStats, label } from './stats.js';
+import { randomLook, sanitizeLook, drawPreview, drawIconCentered, setSceneTheme, EMOTES, EMOTE_NAMES, SHIRTS, HAIR_STYLES, HAIR_COLORS, SKINS, ACCESSORIES, DECALS, PETS } from './sprites.js';
+import { DECKS, DECK_IDS, ALL_CARDS, deckOf, formatScale, computeStats, label } from './stats.js';
+import { computeRecap } from './recap.js';
+import qrcode from '../vendor/qrcode.mjs';
 import { play, isMuted, setMuted } from './audio.js';
 import { roomSlug, parseRoomHash } from './room-name.js';
 
@@ -87,6 +89,9 @@ const state = {
   chatUnread: 0,
   eventLog: new Map(), // sender id -> recent event times, for the flood limit
   skey: null, // storage key for this room
+  rounds: new Map(), // round -> what this browser saw at its reveal, for the session recap
+  firstVoter: new Map(), // round -> id of the first person seen voting
+  handDeck: null,
 };
 
 function parseHash() {
@@ -104,7 +109,10 @@ const LOOK_PARTS = [
   { key: 'shirt', label: 'Top', n: SHIRTS.length },
   { key: 'acc', label: 'Extra', n: ACCESSORIES.length },
   { key: 'decal', label: 'Logo', n: DECALS.length },
+  { key: 'pet', label: 'Pet', n: PETS.length },
 ];
+// the logo and pet rows name what is picked, the others name the part
+const lookName = (key, look) => (key === 'decal' ? DECALS[look.decal].name : key === 'pet' ? PETS[look.pet].name : null);
 
 let lobbyRaf = 0;
 
@@ -130,8 +138,7 @@ function initLobby() {
     prev.textContent = '<';
     prev.setAttribute('aria-label', `Previous ${part.label}`);
     const name = document.createElement('span');
-    // the logo row names the logo, the others name the part
-    const showName = () => (name.textContent = part.key === 'decal' ? DECALS[state.me.look.decal].name : part.label);
+    const showName = () => (name.textContent = lookName(part.key, state.me.look) ?? part.label);
     showName();
     name.dataset.part = part.key;
     const next = document.createElement('button');
@@ -152,8 +159,10 @@ function initLobby() {
   $('#reroll').onclick = () => {
     state.me.look = randomLook();
     store.set('localStorage', 'sop.look', state.me.look);
-    const logo = controls.querySelector('[data-part="decal"]');
-    if (logo) logo.textContent = DECALS[state.me.look.decal].name;
+    for (const key of ['decal', 'pet']) {
+      const row = controls.querySelector(`[data-part="${key}"]`);
+      if (row) row.textContent = lookName(key, state.me.look);
+    }
     play('pick');
   };
   $('#create-instead').onclick = () => {
@@ -263,7 +272,7 @@ async function enterRoom(rc, { creating, roomName }) {
   if (!state.scene) {
     state.scene = new Scene($('#stage'), { onSeatClick: throwAt });
     state.scene.setMotion(motionMode());
-    buildHand();
+    buildHand(state.room?.deck);
     buildEmotes();
     wireRoomControls();
   }
@@ -284,7 +293,7 @@ async function enterRoom(rc, { creating, roomName }) {
   $('#conn').className = 'conn online';
 
   if (creating) {
-    state.room = { v: 1, seq: 1, name: roomName, hostId: state.me.id, round: 1, revealed: false, timerEnd: null, autoReveal: false, createdAt: Date.now() };
+    state.room = { v: 1, seq: 1, name: roomName, hostId: state.me.id, round: 1, deck: 'fib', revealed: false, timerEnd: null, autoReveal: false, createdAt: Date.now() };
     rc.publishRoom(state.room);
     state.ready = true;
   } else {
@@ -364,7 +373,7 @@ function checkHost() {
   if (!state.room) {
     // empty room with no state at all (relay forgot it): start fresh
     if (effectiveHostId(list) === state.me.id) {
-      updateRoom({ v: 1, name: state.roomLabel || 'Planning room', hostId: state.me.id, round: 1, revealed: false, timerEnd: null, autoReveal: false, createdAt: Date.now() });
+      updateRoom({ v: 1, name: state.roomLabel || 'Planning room', hostId: state.me.id, round: 1, deck: 'fib', revealed: false, timerEnd: null, autoReveal: false, createdAt: Date.now() });
     }
     return;
   }
@@ -421,7 +430,7 @@ function sanitizePresence(d) {
     ts: Number.isFinite(d.ts) ? d.ts : 0,
     round: Number.isInteger(d.round) ? d.round : 0,
     voted: !!d.voted,
-    vote: DECK.includes(d.vote) ? d.vote : null,
+    vote: ALL_CARDS.has(d.vote) ? d.vote : null,
     pick: Number.isInteger(d.pick) ? d.pick : 0,
     away: !!d.away,
   };
@@ -439,6 +448,7 @@ function onPresence(raw) {
     if (id !== p.id && q.offline && q.name.toLowerCase() === p.name.toLowerCase()) removePeer(id, { quiet: true });
   }
   state.peers.set(p.id, { ...p, seenAt: Date.now() });
+  if (prev && !prev.voted && p.voted) noteVoter(p.id, p.round);
   resolveNameClash();
   const back = state.recentlyGone.get(p.id);
   state.recentlyGone.delete(p.id);
@@ -522,6 +532,10 @@ function sanitizeRoom(d) {
     name: str(d.name, 40) || 'Planning room',
     hostId: d.hostId.slice(0, 16),
     round: d.round,
+    // the round number people see; a re-vote opens a new voting round under the same number
+    label: smallInt(d.label, 1e6) ? d.label : d.round,
+    revote: smallInt(d.revote, 1e3) ? d.revote : 0,
+    deck: DECK_IDS.includes(d.deck) ? d.deck : 'fib',
     revealed: !!d.revealed,
     timerEnd: Number.isFinite(d.timerEnd) ? d.timerEnd : null,
     autoReveal: !!d.autoReveal,
@@ -544,8 +558,11 @@ function onRoom(raw) {
     play('round');
     state.myVote = null;
     state.myRound = next.round;
+    state.poked = false;
     saveVote();
+    if (next.label === prev.label && next.revote > prev.revote) toast('Re-vote! Pick a card again.');
   }
+  if (prev && next.deck !== prev.deck) toast(`New deck: ${deckOf(next.deck).name}. Pick a card again.`);
   if (prev && next.revealed && !prev.revealed) play('reveal');
   if (prev && prev.hostId !== next.hostId) {
     const host = allPlayers().find((p) => p.id === next.hostId);
@@ -563,6 +580,18 @@ function onEvent(e) {
   const recent = (state.eventLog.get(e.from) || []).filter((t) => now - t < EVENT_WINDOW_MS);
   if (recent.length >= EVENT_BURST) return;
   state.eventLog.set(e.from, [...recent, now]);
+  if (e.type === 'poke') {
+    if (e.from !== state.room?.hostId || !Array.isArray(e.ids)) return;
+    const ids = e.ids.filter((id) => typeof id === 'string').slice(0, MAX_PEERS);
+    state.scene.poke(ids);
+    if (ids.includes(state.me.id) && !state.room.revealed && !state.myVote) {
+      play('poke');
+      state.poked = true;
+      renderTitle();
+      toast(`${state.peers.get(e.from)?.name || 'The host'} is waiting for your vote`);
+    }
+    return;
+  }
   if (e.type === 'kick') {
     // only the host clears a sleeping seat, and never ours: we are clearly here
     if (typeof e.id === 'string' && e.id !== state.me.id && e.from === state.room?.hostId) removePeer(e.id);
@@ -625,10 +654,34 @@ function pickCard(value) {
   }
   state.myRound = room.round;
   state.myPick += 1;
+  if (state.myVote) noteVoter(state.me.id, room.round);
+  if (state.poked) {
+    state.poked = false;
+    renderTitle();
+  }
   saveVote();
   publishPresence();
   maybeAutoReveal();
   render();
+}
+
+// the first vote seen in a round wins the round's "fastest draw"
+function noteVoter(id, round) {
+  if (state.room && !state.room.revealed && round === state.room.round && !state.firstVoter.has(round)) state.firstVoter.set(round, id);
+}
+
+// Switching decks clears everyone's card: same round number, a fresh hand.
+function cycleDeck() {
+  if (!amHost()) return;
+  const room = state.room;
+  const deck = DECK_IDS[(DECK_IDS.indexOf(deckOf(room.deck).id) + 1) % DECK_IDS.length];
+  state.myVote = null;
+  state.myRound = room.round + 1;
+  saveVote();
+  updateRoom({ ...room, deck, round: room.round + 1, label: room.label ?? room.round, revealed: false, timerEnd: null });
+  play('round');
+  toast(`Deck: ${DECKS[deck].name}`);
+  publishPresence();
 }
 
 function reveal() {
@@ -644,9 +697,43 @@ function nextRound() {
   state.myVote = null;
   state.myRound = room.round + 1;
   saveVote();
-  updateRoom({ ...room, round: room.round + 1, revealed: false, timerEnd: null });
+  updateRoom({ ...room, round: room.round + 1, label: (room.label ?? room.round) + 1, revote: 0, revealed: false, timerEnd: null });
   play('round');
   publishPresence();
+}
+
+// After a big spread: same round number, everyone's card goes back to their hand.
+function revote() {
+  if (!amHost() || !state.room.revealed) return;
+  const room = state.room;
+  state.myVote = null;
+  state.myRound = room.round + 1;
+  saveVote();
+  updateRoom({ ...room, round: room.round + 1, label: room.label ?? room.round, revote: (room.revote || 0) + 1, revealed: false, timerEnd: null });
+  play('round');
+  toast('Re-vote started');
+  publishPresence();
+}
+
+// Who the host is still waiting for: voters who are here and have not picked a card.
+function waitingFor() {
+  return allPlayers().filter((p) => !p.isMe && !p.spectator && !p.offline && !p.voted);
+}
+
+function poke() {
+  if (!amHost() || state.room.revealed) return;
+  const ids = waitingFor().map((p) => p.id);
+  if (!ids.length) return;
+  state.scene.poke(ids);
+  play('poke');
+  state.rc.sendEvent({ type: 'poke', from: state.me.id, ids });
+  toast(ids.length === 1 ? 'Poked 1 person' : `Poked ${ids.length} people`);
+}
+
+function toggleAutoReveal() {
+  if (!amHost()) return;
+  updateRoom({ ...state.room, autoReveal: !state.room.autoReveal });
+  maybeAutoReveal();
 }
 
 function setTimer(sec) {
@@ -829,7 +916,8 @@ function jumpToLatestChat() {
 // a background tab shows the unread count in its title
 function renderTitle() {
   const base = `${state.room?.name || 'Planning'} · Pixel Poker`;
-  document.title = state.chatUnread ? `(${state.chatUnread}) ${base}` : base;
+  const badge = [state.poked ? '!' : '', state.chatUnread ? String(state.chatUnread) : ''].filter(Boolean).join(' ');
+  document.title = badge ? `(${badge}) ${base}` : base;
 }
 
 function sendEmote(icon) {
@@ -867,10 +955,12 @@ async function copyText(text, okMsg) {
 
 // ---------- wiring ----------
 
-function buildHand() {
+function buildHand(deckId) {
+  const deck = deckOf(deckId);
+  state.handDeck = deck.id;
   const hand = $('#hand');
   hand.innerHTML = '';
-  for (const v of DECK) {
+  for (const v of deck.cards) {
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'card';
@@ -886,7 +976,7 @@ function buildHand() {
     } else {
       b.textContent = label(v);
       if (label(v).length >= 3) b.classList.add('card-small');
-      b.setAttribute('aria-label', v === '?' ? 'Not sure' : `${label(v)} points`);
+      b.setAttribute('aria-label', v === '?' ? 'Not sure' : deck.id === 'fib' ? `${label(v)} points` : label(v));
     }
     b.onclick = () => pickCard(v);
     hand.append(b);
@@ -918,6 +1008,14 @@ function wireRoomControls() {
   $('#leave').onclick = leaveRoom;
   $('#reveal').onclick = reveal;
   $('#next').onclick = nextRound;
+  $('#revote').onclick = revote;
+  $('#poke').onclick = poke;
+  $('#qr').onclick = (e) => {
+    e.stopPropagation();
+    toggleQr();
+  };
+  $('#recap-close').onclick = () => $('#recap').close();
+  $('#recap-copy').onclick = () => copyText(recapText(), 'Recap copied');
   $('#chat-pill').onclick = jumpToLatestChat;
   buildEmojiPanel();
   $('#emoji-btn').onclick = () => toggleEmojiPanel();
@@ -933,12 +1031,6 @@ function wireRoomControls() {
     toggleEmojiPanel(false);
   };
   document.querySelectorAll('[data-timer]').forEach((b) => (b.onclick = () => setTimer(Number(b.dataset.timer))));
-  $('#auto-reveal').onchange = (e) => {
-    if (amHost()) {
-      updateRoom({ ...state.room, autoReveal: e.target.checked });
-      maybeAutoReveal();
-    }
-  };
   document.addEventListener('visibilitychange', () => {
     publishPresence();
     render();
@@ -950,8 +1042,11 @@ function wireRoomControls() {
   window.addEventListener('pageshow', (e) => e.persisted && location.reload());
   document.addEventListener('keydown', (e) => {
     if (e.target.closest('input, textarea') || e.metaKey || e.ctrlKey || e.altKey) return;
-    const map = { 1: '1', 2: '2', 3: '3', 5: '5', 8: '8', '?': '?', c: 'coffee' };
-    if (map[e.key]) pickCard(map[e.key]);
+    // points pick by value; other decks pick the nth card with 1-9
+    const deck = deckOf(state.room?.deck);
+    const map = deck.id === 'fib' ? { 1: '1', 2: '2', 3: '3', 5: '5', 8: '8' } : Object.fromEntries(deck.cards.slice(0, -2).map((c, i) => [i + 1, c]));
+    const card = { ...map, '?': '?', c: 'coffee' }[e.key];
+    if (card) pickCard(card);
   });
 }
 
@@ -987,6 +1082,29 @@ const SETTINGS = [
     label: () => (state.me.spectator ? 'Switch to voter' : 'Switch to observer'),
     value: () => '',
     toggle: () => toggleRole(),
+  },
+  // room rules only the host sets: set once, so they live here instead of the round bar
+  {
+    hostOnly: true,
+    icon: () => 'card',
+    label: () => 'Deck',
+    value: () => deckOf(state.room?.deck).name,
+    toggle: () => cycleDeck(),
+  },
+  {
+    hostOnly: true,
+    icon: () => (state.room?.autoReveal ? 'check' : 'eye'),
+    label: () => 'Auto-show votes',
+    value: () => (state.room?.autoReveal ? 'On' : 'Off'),
+    toggle: () => toggleAutoReveal(),
+  },
+  {
+    inRoom: true,
+    action: true,
+    icon: () => 'star',
+    label: () => 'Session recap',
+    value: () => (state.rounds.size ? `${state.rounds.size} ${state.rounds.size === 1 ? 'round' : 'rounds'}` : ''),
+    toggle: () => openRecap(),
   },
   {
     icon: () => (root.dataset.theme === 'light' ? 'sun' : 'moon'),
@@ -1044,20 +1162,22 @@ function paintGears() {
   $('#emoji-btn')?.replaceChildren(iconCanvas('smile'));
 }
 
+const visibleSettings = () => SETTINGS.filter((x) => (!x.inRoom || state.rc) && (!x.hostOnly || (state.rc && amHost())));
+
 function renderSettingsMenu() {
   const menu = $('#settings-menu');
   menu.replaceChildren();
-  for (const item of SETTINGS) {
-    if (item.inRoom && !state.rc) continue;
+  for (const item of visibleSettings()) {
     const b = el('button', 'menu-item');
     b.type = 'button';
     b.setAttribute('role', 'menuitem');
     b.append(iconCanvas(item.icon()), el('span', 'menu-label', item.label()), el('span', 'menu-value', item.value()));
     b.onclick = () => {
+      if (item.action) return item.toggle();
       item.toggle();
       play('pick');
       renderSettingsMenu();
-      menu.querySelectorAll('.menu-item')[[...SETTINGS].filter((x) => !x.inRoom || state.rc).indexOf(item)]?.focus();
+      menu.querySelectorAll('.menu-item')[visibleSettings().indexOf(item)]?.focus();
     };
     menu.append(b);
   }
@@ -1099,11 +1219,13 @@ function wireSettings() {
     // a clicked menu item is redrawn (and so detached) by the time this runs: that is not an outside click
     if (e.target.isConnected && !e.target.closest('#settings-menu')) closeSettings();
     if (e.target.isConnected && !e.target.closest('#emoji-panel, #emoji-btn')) toggleEmojiPanel(false);
+    if (e.target.isConnected && !e.target.closest('#qr-pop, #qr') && $('#qr-pop')) toggleQr(false);
   });
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
       closeSettings({ refocus: true });
       toggleEmojiPanel(false);
+      if ($('#qr-pop')) toggleQr(false);
     }
   });
   window.addEventListener('resize', () => closeSettings());
@@ -1156,7 +1278,8 @@ function render() {
 
   $('#room-title').textContent = room?.name || 'Planning room';
   renderTitle();
-  $('#round-no').textContent = room?.round ?? '-';
+  $('#round-no').textContent = room ? (room.label ?? room.round) : '-';
+  $('#revote-chip').hidden = !room?.revote;
   renderStatus();
 
   // host tools live in the round bar: while voting the timer, auto-show and Show votes,
@@ -1167,16 +1290,21 @@ function render() {
     $('#host-tools').hidden = room.revealed;
     $('#reveal').hidden = room.revealed;
     $('#next').hidden = !room.revealed;
+    $('#revote').hidden = !room.revealed;
+    // poke only makes sense while someone is still thinking
+    const waiting = room.revealed ? 0 : waitingFor().length;
+    $('#poke').hidden = !waiting;
+    $('#poke').textContent = waiting > 1 ? `Poke ${waiting}` : 'Poke';
   }
   if (host) {
-    $('#auto-reveal').checked = !!room.autoReveal;
     document.querySelectorAll('[data-timer]').forEach((b) => {
       b.disabled = room.revealed;
       b.classList.toggle('is-active', b.dataset.timer === '0' ? !room.timerEnd : false);
     });
   }
 
-  // hand
+  // hand: rebuilt when the host switches decks
+  if (room && deckOf(room.deck).id !== state.handDeck) buildHand(room.deck);
   const canVote = room && !room.revealed && !state.me.spectator;
   document.querySelectorAll('#hand .card').forEach((c) => {
     c.disabled = !canVote;
@@ -1186,13 +1314,15 @@ function render() {
 
   // scene
   const revealedVotes = players.filter((p) => p.vote != null);
-  const stats = computeStats(revealedVotes);
+  const stats = computeStats(revealedVotes, room?.deck);
+  if (room?.revealed && revealedVotes.length) recordRound(room, revealedVotes);
   const allIn = players.filter((p) => p.voted).every((p) => p.vote != null);
   state.scene.setRoom({ revealed: !!room?.revealed, consensus: !!room?.revealed && allIn && stats.consensus, timerEnd: room?.timerEnd });
   state.scene.setPlayers(players);
 
   renderPlayers(players, host);
   renderResults(room, stats, allIn);
+  if ($('#recap').open) renderRecap();
 
 }
 
@@ -1249,6 +1379,18 @@ function el(tag, cls, text) {
   return e;
 }
 
+function recordRound(room, votes) {
+  state.rounds.set(room.round, {
+    label: room.label ?? room.round,
+    revote: room.revote || 0,
+    deck: deckOf(room.deck).id,
+    votes: votes.map((p) => ({ id: p.id, name: p.name, vote: p.vote })),
+    first: state.firstVoter.get(room.round) ?? null,
+  });
+  // a very long session keeps its latest rounds
+  if (state.rounds.size > 300) state.rounds.delete(state.rounds.keys().next().value);
+}
+
 function renderResults(room, s, allIn) {
   const box = $('#results');
   const show = !!room?.revealed;
@@ -1258,6 +1400,7 @@ function renderResults(room, s, allIn) {
   box.hidden = !show;
   if (!show) return;
   box.innerHTML = '';
+  const fmt = (n) => formatScale(room.deck, n);
   box.append(el('h2', null, 'Results'));
   if (!s.total) {
     box.append(el('div', 'res-note', allIn ? 'Nobody voted this round.' : 'Collecting votes...'));
@@ -1265,9 +1408,10 @@ function renderResults(room, s, allIn) {
   }
   const top = el('div', 'res-top');
   const t1 = el('div', 'res-tile is-main');
-  t1.append(el('span', 'k', 'Average'), el('span', 'v', s.average ?? '-'));
+  // sizes have no average: the size nearest the middle stands in for it
+  t1.append(el('span', 'k', 'Average'), el('span', 'v', fmt(s.average)));
   const t2 = el('div', 'res-tile');
-  t2.append(el('span', 'k', 'Suggested'), el('span', 'v', s.suggested != null ? label(String(s.suggested)) : '-'));
+  t2.append(el('span', 'k', 'Suggested'), el('span', 'v', fmt(s.suggested)));
   top.append(t1, t2);
   box.append(top);
 
@@ -1276,8 +1420,8 @@ function renderResults(room, s, allIn) {
     r.append(el('span', null, k), el('b', null, v));
     return r;
   };
-  if (s.median != null) box.append(row('Median', label(String(s.median))));
-  if (s.min != null) box.append(row('Range', s.min === s.max ? label(String(s.min)) : `${label(String(s.min))} to ${label(String(s.max))}`));
+  if (s.median != null) box.append(row('Median', fmt(s.median)));
+  if (s.min != null) box.append(row('Range', s.min === s.max ? fmt(s.min) : `${fmt(s.min)} to ${fmt(s.max)}`));
   if (s.numericCount) box.append(row('Agreement', `${s.agreement}%`));
   box.append(row('Votes', String(s.total)));
 
@@ -1299,6 +1443,89 @@ function renderResults(room, s, allIn) {
   else if (s.spread) box.append(el('div', 'res-note is-warn', `Big spread: ${s.spread.low.name} (${label(s.spread.low.vote)}) and ${s.spread.high.name} (${label(s.spread.high.vote)}), tell us what you see.`));
   if (s.coffee) box.append(el('div', 'res-note', `${s.coffee} ${s.coffee === 1 ? 'person needs' : 'people need'} a coffee break.`));
   if (s.unsure) box.append(el('div', 'res-note', `${s.unsure} not sure. Maybe it needs more detail.`));
+  const more = el('button', 'btn btn-small res-recap', 'Session recap');
+  more.type = 'button';
+  more.onclick = openRecap;
+  box.append(more);
+}
+
+// ---------- session recap: a card worth a screenshot at the end of planning ----------
+
+function openRecap() {
+  closeSettings();
+  renderRecap();
+  $('#recap').showModal();
+  play('reveal');
+}
+
+function renderRecap() {
+  const r = computeRecap([...state.rounds.values()]);
+  $('#recap-room').textContent = `${state.room?.name || 'Planning room'} · ${new Date().toLocaleDateString('sv-SE')}`;
+  const tiles = $('#recap-tiles');
+  tiles.replaceChildren();
+  for (const [k, v] of [
+    ['Rounds', r.rounds],
+    ['Consensus', r.consensus],
+    ['Agreement', r.agreement == null ? '-' : `${r.agreement}%`],
+  ]) {
+    const t = el('div', 'res-tile');
+    t.append(el('span', 'k', k), el('span', 'v', String(v)));
+    tiles.append(t);
+  }
+  const awards = $('#recap-awards');
+  awards.replaceChildren();
+  if (!r.awards.length) awards.append(el('li', 'res-note', 'Play a round and the awards show up here.'));
+  for (const a of r.awards) {
+    const li = el('li', 'award');
+    const text = el('div', 'award-text');
+    text.append(el('span', 'award-title', a.title), el('b', 'award-names', a.names.join(' & ') + (a.more ? ` +${a.more}` : '')), el('span', 'award-line', a.line));
+    li.append(iconCanvas(a.icon), text);
+    awards.append(li);
+  }
+  const list = $('#recap-rounds');
+  list.replaceChildren();
+  for (const x of r.list.slice(-12)) {
+    const li = el('li');
+    li.append(el('span', null, `Round ${x.label}${x.revote ? ` (re-vote ${x.revote})` : ''}`), el('b', null, x.result));
+    if (x.consensus) li.append(el('span', 'recap-ok', 'consensus'));
+    list.append(li);
+  }
+  $('#recap-rounds-wrap').hidden = !r.list.length;
+}
+
+function recapText() {
+  const r = computeRecap([...state.rounds.values()]);
+  return [
+    `${state.room?.name || 'Planning room'} - ${new Date().toLocaleDateString('sv-SE')}`,
+    `${r.rounds} rounds, ${r.consensus} with consensus${r.agreement == null ? '' : `, ${r.agreement}% agreement`}`,
+    ...r.awards.map((a) => `${a.title}: ${a.names.join(' & ')} (${a.line})`),
+    ...r.list.map((x) => `Round ${x.label}${x.revote ? ` re-vote ${x.revote}` : ''}: ${x.result}${x.consensus ? ' (consensus)' : ''}`),
+  ].join('\n');
+}
+
+// ---------- QR code of the invite link, drawn locally ----------
+
+function toggleQr(open = $('#qr-pop').hidden) {
+  const pop = $('#qr-pop');
+  $('#qr').setAttribute('aria-expanded', String(open));
+  if (!open) {
+    pop.hidden = true;
+    return;
+  }
+  const qr = qrcode(0, 'M');
+  qr.addData(location.href);
+  qr.make();
+  const n = qr.getModuleCount();
+  const quiet = 4;
+  const c = $('#qr-canvas');
+  c.width = c.height = n + quiet * 2;
+  const ctx = c.getContext('2d');
+  // dark on white whatever the theme: phone cameras want it that way
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, c.width, c.height);
+  ctx.fillStyle = '#0d0b1a';
+  for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) if (qr.isDark(y, x)) ctx.fillRect(x + quiet, y + quiet, 1, 1);
+  pop.hidden = false;
 }
 
 // ============================================================

@@ -640,6 +640,15 @@ input::placeholder {
   gap: 2px 14px;
 }
 
+.revote-chip {
+  font-family: var(--font-display);
+  font-size: 13px;
+  color: var(--ink);
+  background: var(--accent-2);
+  padding: 4px 8px;
+  white-space: nowrap;
+}
+
 .host-chip {
   font-family: var(--font-display);
   font-size: 13px;
@@ -1698,4 +1707,196 @@ input::placeholder {
   animation-duration: 1ms !important;
   animation-iteration-count: 1 !important;
   transition-duration: 1ms !important;
+}
+
+/* ---------- QR code popover ---------- */
+
+.qr-pop {
+  position: fixed;
+  z-index: 20;
+  top: 72px;
+  right: 16px;
+  padding: 12px;
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  background: var(--menu-bg);
+  box-shadow:
+    0 -4px 0 0 var(--border-light),
+    0 4px 0 0 var(--border-light),
+    -4px 0 0 0 var(--border-light),
+    4px 0 0 0 var(--border-light),
+    0 16px 32px var(--shadow);
+}
+
+.qr-pop[hidden] {
+  display: none;
+}
+
+.qr-canvas {
+  width: 220px;
+  height: 220px;
+  image-rendering: pixelated;
+}
+
+.qr-pop p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--secondary);
+}
+
+/* ---------- session recap ---------- */
+
+.res-recap {
+  margin-top: 12px;
+  width: 100%;
+}
+
+.recap {
+  /* the page reset zeroes margins; a modal dialog centres itself with auto ones */
+  margin: auto;
+  width: min(520px, calc(100vw - 32px));
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+  padding: 20px;
+  border: 0;
+  color: var(--text);
+  background: linear-gradient(180deg, var(--accent-15), transparent 40%), var(--panel);
+}
+
+.recap::backdrop {
+  background: rgb(8 6 18 / 70%);
+}
+
+.recap-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.recap-head h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 24px;
+  color: var(--gold-text);
+}
+
+.recap-room {
+  margin: 4px 0 0;
+  color: var(--secondary);
+  font-size: 14px;
+}
+
+.recap-tiles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.recap-tiles .v {
+  font-size: 26px;
+}
+
+.recap-awards {
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.award {
+  display: grid;
+  grid-template-columns: 36px 1fr;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--sub);
+}
+
+.award .px-icon {
+  width: 36px;
+  height: 36px;
+  image-rendering: pixelated;
+}
+
+.award-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.award-title {
+  font-size: 12px;
+  color: var(--secondary);
+  text-transform: uppercase;
+}
+
+.award-names {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: inherit;
+  color: var(--accent);
+  overflow-wrap: anywhere;
+}
+
+.award-line {
+  font-size: 14px;
+  color: var(--value);
+}
+
+.recap h3 {
+  margin: 16px 0 6px;
+  font-size: 13px;
+  color: var(--secondary);
+  text-transform: uppercase;
+}
+
+.recap-rounds {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.recap-rounds li {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  font-size: 15px;
+  color: var(--secondary);
+  padding: 2px 0;
+}
+
+.recap-rounds b {
+  margin-left: auto;
+  color: var(--text);
+  font-family: var(--font-display);
+}
+
+.recap-ok {
+  font-size: 12px;
+  color: var(--good-fg);
+}
+
+.recap-foot {
+  margin: 14px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.recap-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+/* on a phone the QR has no one to show it to, and the top bar has no room for it */
+@media (max-width: 640px) {
+  #qr {
+    display: none;
+  }
 }
