@@ -103,6 +103,7 @@ body {
   font-family: var(--font);
   font-size: 16px;
   -webkit-font-smoothing: none;
+  letter-spacing: 0;
   /* the pixel font's "fi" ligature reads as "A": "final" would show as "Anal" */
   font-variant-ligatures: none;
   font-feature-settings: 'liga' 0, 'clig' 0;
@@ -110,6 +111,7 @@ body {
 
 button,
 input {
+  letter-spacing: 0;
   font-variant-ligatures: none;
   font-feature-settings: 'liga' 0, 'clig' 0;
 }
@@ -673,6 +675,8 @@ input::placeholder {
 }
 
 .plate {
+  /* a paper tent card standing on the desk edge: a darker fold along the top,
+     a pixel outline and a small shadow where it meets the desk */
   position: absolute;
   left: var(--plate-inset);
   right: var(--plate-inset);
@@ -680,9 +684,11 @@ input::placeholder {
   height: var(--plate-h);
   display: grid;
   place-items: center;
-  background: var(--plate-bg);
-  box-shadow: 0 0 0 2px var(--border-light);
-  padding: 0 4px;
+  padding: 2px 5px 0;
+  background: linear-gradient(var(--paper-shade) 0 3px, var(--paper) 3px);
+  box-shadow:
+    0 0 0 2px var(--ink),
+    0 5px 0 0 var(--shadow);
 }
 
 .plate-name {
@@ -690,36 +696,47 @@ input::placeholder {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: clamp(10px, calc(var(--plate-h) * 0.55), 15px);
-  font-weight: 600;
-  color: var(--plate-text);
+  font-size: clamp(11px, calc(var(--plate-h) * 0.55), 17px);
+  font-weight: 700;
+  color: var(--ink);
   line-height: 1;
 }
 
+/* your own card: a mint fold so you find yourself at a glance */
 .seat.is-me .plate {
-  box-shadow: 0 0 0 2px var(--accent);
+  background: linear-gradient(var(--accent) 0 3px, var(--paper) 3px);
+  box-shadow:
+    0 0 0 2px var(--ink),
+    0 0 0 4px var(--accent),
+    0 7px 0 0 var(--shadow);
 }
 
-.seat.is-me .plate-name {
-  color: var(--accent);
-}
-
-.seat.is-host .plate-name::before {
-  content: '';
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  margin-right: 4px;
+/* the host's card wears a little gold tab */
+.seat.is-host .plate::after {
+  content: 'HOST';
+  position: absolute;
+  top: -9px;
+  right: -6px;
+  padding: 2px 4px 1px;
+  font-family: var(--font-display);
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--ink);
   background: var(--gold);
-  vertical-align: middle;
+  box-shadow: 0 0 0 2px var(--ink);
 }
 
 .seat.is-offline .plate {
   opacity: 0.55;
 }
 
+/* observers get a plain grey card */
+.seat.is-spectator .plate {
+  background: linear-gradient(var(--muted) 0 3px, var(--paper-shade) 3px);
+}
+
 .seat.is-spectator .plate-name {
-  color: var(--secondary);
   font-style: italic;
 }
 

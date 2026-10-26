@@ -1,6 +1,6 @@
 import { RoomClient, newToken, newId } from './net.js';
 import { Scene } from './scene.js';
-import { randomLook, sanitizeLook, drawPreview, drawIconCentered, setSceneTheme, EMOTES, EMOTE_NAMES, SHIRTS, HAIR_STYLES, HAIR_COLORS, SKINS, ACCESSORIES } from './sprites.js';
+import { randomLook, sanitizeLook, drawPreview, drawIconCentered, setSceneTheme, EMOTES, EMOTE_NAMES, SHIRTS, HAIR_STYLES, HAIR_COLORS, SKINS, ACCESSORIES, DECALS } from './sprites.js';
 import { DECK, computeStats, label } from './stats.js';
 import { play, isMuted, setMuted } from './audio.js';
 import { roomSlug, parseRoomHash } from './room-name.js';
@@ -103,6 +103,7 @@ const LOOK_PARTS = [
   { key: 'skin', label: 'Skin', n: SKINS.length },
   { key: 'shirt', label: 'Top', n: SHIRTS.length },
   { key: 'acc', label: 'Extra', n: ACCESSORIES.length },
+  { key: 'decal', label: 'Logo', n: DECALS.length },
 ];
 
 let lobbyRaf = 0;
@@ -129,7 +130,10 @@ function initLobby() {
     prev.textContent = '<';
     prev.setAttribute('aria-label', `Previous ${part.label}`);
     const name = document.createElement('span');
-    name.textContent = part.label;
+    // the logo row names the logo, the others name the part
+    const showName = () => (name.textContent = part.key === 'decal' ? DECALS[state.me.look.decal].name : part.label);
+    showName();
+    name.dataset.part = part.key;
     const next = document.createElement('button');
     next.type = 'button';
     next.className = 'btn';
@@ -138,6 +142,7 @@ function initLobby() {
     const step = (d) => {
       state.me.look[part.key] = (state.me.look[part.key] + d + part.n) % part.n;
       store.set('localStorage', 'sop.look', state.me.look);
+      showName();
       play('pick');
     };
     prev.onclick = () => step(-1);
@@ -147,6 +152,8 @@ function initLobby() {
   $('#reroll').onclick = () => {
     state.me.look = randomLook();
     store.set('localStorage', 'sop.look', state.me.look);
+    const logo = controls.querySelector('[data-part="decal"]');
+    if (logo) logo.textContent = DECALS[state.me.look.decal].name;
     play('pick');
   };
   $('#create-instead').onclick = () => {
@@ -952,7 +959,7 @@ function wireRoomControls() {
 
 const root = document.documentElement;
 // 'on' (full), 'minimal' or 'off'
-const motionMode = () => (['minimal', 'off'].includes(root.dataset.motion) ? root.dataset.motion : 'on');
+const motionMode = () => (['on', 'off'].includes(root.dataset.motion) ? root.dataset.motion : 'minimal');
 const motionOn = () => motionMode() !== 'off';
 
 // raw strings, not JSON: js/boot.js reads them before the modules load

@@ -83,6 +83,40 @@ export const SHIRTS = ['#4de0c0', '#7fe9ff', '#ff5d73', '#8b6cff', '#5ee27a', '#
 export const HAIR_STYLES = ['short', 'long', 'bun', 'spiky', 'bald', 'cap', 'curly', 'mohawk', 'ponytail'];
 export const ACCESSORIES = ['none', 'none', 'glasses', 'sunglasses', 'headphones', 'beard', 'mustache'];
 
+// Chest logos: playful 5x5 nods to games and tech, not copies of real marks.
+// Letters are colours (see DECAL_INKS); '.' is the shirt showing through.
+export const DECALS = [
+  { name: 'None', rows: [] },
+  { name: 'Invader', rows: ['.g.g.', 'ggggg', 'gkgkg', 'ggggg', 'g...g'] },
+  { name: 'Creeper', rows: ['ggggg', 'gkgkg', 'ggkgg', 'gkkkg', 'gkgkg'] },
+  { name: 'Ghost', rows: ['.rrr.', 'rrrrr', 'rwrwr', 'rrrrr', 'r.r.r'] },
+  { name: 'Mushroom', rows: ['.rrr.', 'rwrwr', 'rrrrr', '.www.', '.w.w.'] },
+  { name: 'Crewmate', rows: ['.rrr.', 'rrccc', 'rrrrr', 'rrrr.', '.r.r.'] },
+  { name: 'Heart', rows: ['rr.rr', 'rrrrr', 'rrrrr', '.rrr.', '..r..'] },
+  { name: 'Coin', rows: ['.yyy.', 'yyoyy', 'yoyyy', 'yyoyy', '.yyy.'] },
+  { name: 'Sword', rows: ['....s', '...s.', 'o.s..', '.o...', 'b.o..'] },
+  { name: 'Apple', rows: ['..b..', '.r.rr', 'rrrr.', 'rrrr.', '.r.r.'] },
+  { name: 'Triangle', rows: ['..w..', '.www.', '.www.', 'wwwww', 'wwwww'] },
+  { name: 'Bug', rows: ['k...k', '.kgk.', 'kgggk', '.ggg.', 'k.k.k'] },
+  { name: 'Terminal', rows: ['kkkkk', 'kgkkk', 'kkgkk', 'kgkgg', 'kkkkk'] },
+  { name: 'Bolt', rows: ['..yy.', '.yy..', 'yyyyy', '..yy.', '.yy..'] },
+  { name: 'Cat', rows: ['k...k', 'kk.kk', 'kkkkk', 'kwkwk', '.kkk.'] },
+];
+
+const DECAL_INKS = { g: '#5ee27a', k: '#1b1730', r: '#ff5d73', w: '#ffffff', c: '#7fe9ff', y: '#ffc93c', o: '#e6a817', s: '#d9d3f2', b: '#8a5532' };
+
+function drawDecal(ctx, x, y, decal) {
+  const rows = DECALS[decal]?.rows || [];
+  rows.forEach((row, yy) => {
+    for (let xx = 0; xx < row.length; xx++) {
+      const ink = DECAL_INKS[row[xx]];
+      if (!ink) continue;
+      ctx.fillStyle = ink;
+      ctx.fillRect(x + xx, y + yy, 1, 1);
+    }
+  });
+}
+
 // ---------- helpers ----------
 
 function hashStr(s) {
@@ -117,6 +151,8 @@ export function randomLook(seed = Math.random() * 1e9) {
     hairColor,
     shirt: pick(SHIRTS.length),
     acc: pick(ACCESSORIES.length),
+    // about half the new characters come with a logo
+    decal: r() < 0.5 ? 0 : 1 + pick(DECALS.length - 1),
   };
 }
 
@@ -129,6 +165,7 @@ export function sanitizeLook(l) {
     hairColor: clamp(l.hairColor, HAIR_COLORS.length),
     shirt: clamp(l.shirt, SHIRTS.length),
     acc: clamp(l.acc, ACCESSORIES.length),
+    decal: clamp(l.decal, DECALS.length),
   };
 }
 
@@ -593,8 +630,9 @@ function drawBody(ctx, cx, dy, hy, look) {
   R(ctx, cx - 1, ty, 2, 2, shade(skin, -0.05));
   R(ctx, cx - 7, ty + 3, 1, dy - ty - 3, shade(shirt, -0.15));
   R(ctx, cx + 6, ty + 3, 1, dy - ty - 3, shade(shirt, -0.15));
-  // a little badge on the mint and sky tops
-  if (look.shirt <= 1) R(ctx, cx + 2, ty + 3, 2, 2, PAL.white);
+  // a chest logo if one is picked, otherwise the little badge on the mint and sky tops
+  if (look.decal) drawDecal(ctx, cx - 3, ty + 3, look.decal);
+  else if (look.shirt <= 1) R(ctx, cx + 2, ty + 3, 2, 2, PAL.white);
   // head
   R(ctx, cx - 4, hy, 8, 10, skin);
   R(ctx, cx - 5, hy + 1, 10, 8, skin);

@@ -180,8 +180,9 @@ export class Scene {
       el.style.top = `${(seat.dy - 46) * S}px`;
       el.style.width = `${SW * S}px`;
       el.style.height = `${65 * S}px`;
-      el.style.setProperty('--plate-top', `${55 * S}px`);
-      el.style.setProperty('--plate-h', `${9 * S}px`);
+      // the card stands on the desk edge, a little taller than the old plate
+      el.style.setProperty('--plate-top', `${52 * S}px`);
+      el.style.setProperty('--plate-h', `${11 * S}px`);
       el.style.setProperty('--plate-inset', `${3 * S}px`);
       el.classList.toggle('is-me', !!p.isMe);
       el.classList.toggle('is-spectator', !!p.spectator);
