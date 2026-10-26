@@ -310,9 +310,8 @@ export class Scene {
     const px = Math.floor(LW / 2) - 10;
     R(ctx, px - 1, 7, 22, 26, PAL.ink);
     R(ctx, px, 8, 20, 24, PAL.panel);
-    drawMark(ctx, px + 5, 10);
-    R(ctx, px + 3, 25, 14, 1, PAL.teal);
-    R(ctx, px + 5, 28, 10, 1, PAL.secondary);
+    drawMark(ctx, px + 1, 9);
+    R(ctx, px + 4, 29, 12, 1, PAL.teal);
 
     // wall screen: countdown or clock
     const mw = 40;

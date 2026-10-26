@@ -377,15 +377,21 @@ input::placeholder {
 }
 
 .lobby-logo {
-  width: 64px;
-  height: 64px;
+  width: 72px;
+  height: 72px;
+  flex: none;
 }
 
 .lobby-brand h1 {
+  /* the card mark sits beside the title, not above it */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
   font-family: var(--font-display);
   font-size: clamp(30px, 6vw, 46px);
-  line-height: 1.35;
-  margin: 18px 0 10px;
+  line-height: 1.2;
+  margin: 8px 0 10px;
   color: var(--accent);
   text-shadow:
     4px 4px 0 var(--ink),

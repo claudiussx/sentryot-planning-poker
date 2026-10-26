@@ -83,24 +83,24 @@ export const SHIRTS = ['#4de0c0', '#7fe9ff', '#ff5d73', '#8b6cff', '#5ee27a', '#
 export const HAIR_STYLES = ['short', 'long', 'bun', 'spiky', 'bald', 'cap', 'curly', 'mohawk', 'ponytail'];
 export const ACCESSORIES = ['none', 'none', 'glasses', 'sunglasses', 'headphones', 'beard', 'mustache'];
 
-// Chest logos: playful 5x5 nods to games and tech, not copies of real marks.
+// Chest logos: playful 6-pixel-wide nods to games and tech, not copies of real marks.
 // Letters are colours (see DECAL_INKS); '.' is the shirt showing through.
 export const DECALS = [
   { name: 'None', rows: [] },
-  { name: 'Invader', rows: ['.g.g.', 'ggggg', 'gkgkg', 'ggggg', 'g...g'] },
-  { name: 'Creeper', rows: ['ggggg', 'gkgkg', 'ggkgg', 'gkkkg', 'gkgkg'] },
-  { name: 'Ghost', rows: ['.rrr.', 'rrrrr', 'rwrwr', 'rrrrr', 'r.r.r'] },
-  { name: 'Mushroom', rows: ['.rrr.', 'rwrwr', 'rrrrr', '.www.', '.w.w.'] },
-  { name: 'Crewmate', rows: ['.rrr.', 'rrccc', 'rrrrr', 'rrrr.', '.r.r.'] },
-  { name: 'Heart', rows: ['rr.rr', 'rrrrr', 'rrrrr', '.rrr.', '..r..'] },
-  { name: 'Coin', rows: ['.yyy.', 'yyoyy', 'yoyyy', 'yyoyy', '.yyy.'] },
-  { name: 'Sword', rows: ['....s', '...s.', 'o.s..', '.o...', 'b.o..'] },
-  { name: 'Apple', rows: ['..b..', '.r.rr', 'rrrr.', 'rrrr.', '.r.r.'] },
-  { name: 'Triangle', rows: ['..w..', '.www.', '.www.', 'wwwww', 'wwwww'] },
-  { name: 'Bug', rows: ['k...k', '.kgk.', 'kgggk', '.ggg.', 'k.k.k'] },
-  { name: 'Terminal', rows: ['kkkkk', 'kgkkk', 'kkgkk', 'kgkgg', 'kkkkk'] },
-  { name: 'Bolt', rows: ['..yy.', '.yy..', 'yyyyy', '..yy.', '.yy..'] },
-  { name: 'Cat', rows: ['k...k', 'kk.kk', 'kkkkk', 'kwkwk', '.kkk.'] },
+  { name: 'Invader', rows: ['.g..g.', 'gggggg', 'gkggkg', 'gggggg', 'g.gg.g'] },
+  { name: 'Creeper', rows: ['gggggg', 'gkggkg', 'gggggg', 'ggkkgg', 'gkkkkg', 'gkggkg'] },
+  { name: 'Ghost', rows: ['.rrrr.', 'rrrrrr', 'rwrrwr', 'rrrrrr', 'r.rr.r'] },
+  { name: 'Mushroom', rows: ['.rrrr.', 'rwrrwr', 'rrrrrr', '.wwww.', '.w..w.'] },
+  { name: 'Crewmate', rows: ['.rrrr.', 'rrrccc', 'rrrrrr', 'rrrrr.', '.rr.r.'] },
+  { name: 'Heart', rows: ['rr..rr', 'rrrrrr', 'rrrrrr', '.rrrr.', '..rr..'] },
+  { name: 'Coin', rows: ['.yyyy.', 'yyooyy', 'yyooyy', 'yyooyy', '.yyyy.'] },
+  { name: 'Sword', rows: ['.....s', '....s.', '...s..', 'o.s...', '.o....', 'b.o...'] },
+  { name: 'Apple', rows: ['...bg.', '.rr.rr', 'rrrrr.', 'rrrrr.', 'rrrrrr', '.rr.rr'] },
+  { name: 'Triangle', rows: ['..ww..', '.wwww.', '.wwww.', 'wwwwww', 'wwwwww'] },
+  { name: 'Bug', rows: ['k....k', '.kggk.', 'kggggk', '.gggg.', 'k.kk.k'] },
+  { name: 'Terminal', rows: ['kkkkkk', 'kgkkkk', 'kkgkkk', 'kgkggk', 'kkkkkk'] },
+  { name: 'Bolt', rows: ['..yyy.', '.yyy..', 'yyyyyy', '..yyy.', '.yyy..'] },
+  { name: 'Cat', rows: ['k....k', 'kk..kk', 'kkkkkk', 'kwkkwk', '.kkkk.'] },
 ];
 
 const DECAL_INKS = { g: '#5ee27a', k: '#1b1730', r: '#ff5d73', w: '#ffffff', c: '#7fe9ff', y: '#ffc93c', o: '#e6a817', s: '#d9d3f2', b: '#8a5532' };
@@ -345,28 +345,35 @@ export function drawIcon(ctx, name, x, y, s = 1, color) {
   });
 }
 
-// The Pixel Poker mark: a playing card with a diamond (9x12).
+// The Pixel Poker mark (18x18): two fanned cards, a mint back and a cream card with a heart.
 const MARK = [
-  ' KKKKKKK ',
-  'KWWWWWWWK',
-  'KWRWWWWWK',
-  'KWWWYWWWK',
-  'KWWYYYWWK',
-  'KWYYYYYWK',
-  'KWWYYYWWK',
-  'KWWWYWWWK',
-  'KWWWWWWWK',
-  'KWWWWWRWK',
-  'KWWWWWWWK',
-  ' KKKKKKK ',
+  ' KKKKKKKK         ',
+  'KMmMMmMMmK        ',
+  'KmMMmMMmMK        ',
+  'KMMmMMmMMK        ',
+  'KMmMMmMMKKKKKKKKK ',
+  'KmMMmMMKWWWWWWWWWK',
+  'KMMmMMmKWRWWWWWWWK',
+  'KMmMMmMKWWWWWWWWWK',
+  'KmMMmMMKWWRRWRRWWK',
+  'KMMmMMmKWrRRRRRRWK',
+  'KMmMMmMKWrRRRRRRWK',
+  'KmMMmMMKWWRRRRRWWK',
+  'KMMmMMmKWWWRRRWWWK',
+  ' KKKKKKKWWWWRWWWWK',
+  '       KWWWWWWWWWK',
+  '       KWWWWWWWRWK',
+  '       KWWWWWWWWWK',
+  '        KKKKKKKKK ',
 ];
 
 export function drawMark(ctx, x, y, s = 1) {
-  const inks = { K: PAL.ink, W: PAL.paper, R: PAL.red, Y: PAL.gold };
+  const inks = { K: PAL.ink, M: '#4de0c0', m: '#2bb597', W: PAL.paper, R: '#ff5d73', r: '#d93d55' };
   MARK.forEach((row, yy) => {
     for (let xx = 0; xx < row.length; xx++) {
-      if (row[xx] === ' ') continue;
-      ctx.fillStyle = inks[row[xx]];
+      const ink = inks[row[xx]];
+      if (!ink) continue;
+      ctx.fillStyle = ink;
       ctx.fillRect(x + xx * s, y + yy * s, s, s);
     }
   });
@@ -631,6 +638,7 @@ function drawBody(ctx, cx, dy, hy, look) {
   R(ctx, cx - 7, ty + 3, 1, dy - ty - 3, shade(shirt, -0.15));
   R(ctx, cx + 6, ty + 3, 1, dy - ty - 3, shade(shirt, -0.15));
   // a chest logo if one is picked, otherwise the little badge on the mint and sky tops
+  // the torso is 14 px wide (cx-7..cx+6) and every logo 6, so cx-3 leaves 4 px of shirt on each side
   if (look.decal) drawDecal(ctx, cx - 3, ty + 3, look.decal);
   else if (look.shirt <= 1) R(ctx, cx + 2, ty + 3, 2, 2, PAL.white);
   // head
