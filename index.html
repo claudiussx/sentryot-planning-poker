@@ -8,11 +8,11 @@
     <meta name="theme-color" content="#16132a" />
     <meta name="referrer" content="no-referrer" />
     <!-- CSP_START: npm run bump rewrites the importmap hash -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'sha256-lZhOq8FElBf/EH1I8OmkBLrxjxqpd3wnTe9kGq75Bzo='; style-src 'self'; font-src 'self'; img-src 'self' data:; connect-src wss://broker.hivemq.com:8884 wss://broker.emqx.io:8084 wss://test.mosquitto.org:8081; worker-src blob:; base-uri 'none'; form-action 'none'" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'sha256-yibkSEyZMgmRuDL4Ujplj4fj9qwO5TQCgo45yIDrS2c='; style-src 'self'; font-src 'self'; img-src 'self' data:; connect-src wss://broker.hivemq.com:8884 wss://broker.emqx.io:8084 wss://test.mosquitto.org:8081; worker-src blob:; base-uri 'none'; form-action 'none'" />
     <!-- CSP_END -->
     <link rel="icon" type="image/svg+xml" href="assets/mark.svg" />
-    <link rel="stylesheet" href="css/style.css?v=10" />
-    <script src="js/boot.js?v=10"></script>
+    <link rel="stylesheet" href="css/style.css?v=11" />
+    <script src="js/boot.js?v=11"></script>
   </head>
   <body>
     <!-- ============ LOBBY ============ -->
@@ -89,7 +89,7 @@
               <div class="status-line" id="status-line"></div>
               <div class="host-actions" id="host-actions" hidden>
                 <button type="button" class="btn btn-primary" id="reveal">Show votes</button>
-                <button type="button" class="btn" id="next">New round</button>
+                <button type="button" class="btn btn-primary" id="next" hidden>New round</button>
               </div>
             </div>
           </div>
@@ -147,17 +147,17 @@
     <script type="importmap">
       {
         "imports": {
-          "./js/main.js": "./js/main.js?v=10",
-          "./js/net.js": "./js/net.js?v=10",
-          "./js/scene.js": "./js/scene.js?v=10",
-          "./js/sprites.js": "./js/sprites.js?v=10",
-          "./js/stats.js": "./js/stats.js?v=10",
-          "./js/audio.js": "./js/audio.js?v=10",
-          "./js/room-name.js": "./js/room-name.js?v=10",
-          "./vendor/mqtt.esm.js": "./vendor/mqtt.esm.js?v=10"
+          "./js/main.js": "./js/main.js?v=11",
+          "./js/net.js": "./js/net.js?v=11",
+          "./js/scene.js": "./js/scene.js?v=11",
+          "./js/sprites.js": "./js/sprites.js?v=11",
+          "./js/stats.js": "./js/stats.js?v=11",
+          "./js/audio.js": "./js/audio.js?v=11",
+          "./js/room-name.js": "./js/room-name.js?v=11",
+          "./vendor/mqtt.esm.js": "./vendor/mqtt.esm.js?v=11"
         }
       }
     </script>
-    <script type="module" src="js/main.js?v=10"></script>
+    <script type="module" src="js/main.js?v=11"></script>
   </body>
 </html>

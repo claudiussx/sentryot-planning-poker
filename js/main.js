@@ -640,7 +640,7 @@ function reveal() {
 }
 
 function nextRound() {
-  if (!amHost()) return;
+  if (!amHost() || !state.room.revealed) return;
   const room = state.room;
   const history = [...room.history];
   if (room.revealed) {
@@ -1042,6 +1042,7 @@ function render() {
   const story = $('#story-text');
   story.hidden = host;
   story.textContent = room?.topic || 'Waiting for the host to name the story';
+  story.title = room?.topic || ''; // long names are cut to two lines; the full text is on hover
   story.classList.toggle('is-empty', !room?.topic);
   $('#story-input').hidden = !host;
   renderStatus();
@@ -1050,8 +1051,9 @@ function render() {
   $('#host-bar').hidden = !host;
   $('#host-actions').hidden = !host;
   if (host) {
+    // one step at a time: show the votes, then move on
     $('#reveal').hidden = room.revealed;
-    $('#next').classList.toggle('btn-primary', room.revealed);
+    $('#next').hidden = !room.revealed;
   }
   if (host) {
     const input = $('#story-input');
