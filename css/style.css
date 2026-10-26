@@ -171,7 +171,6 @@ button {
   font-family: var(--font);
   font-weight: 600;
   font-size: 15px;
-  letter-spacing: 0.02em;
   cursor: pointer;
   box-shadow:
     0 -4px 0 0 var(--btn-edge),
@@ -262,7 +261,6 @@ button {
   color: var(--secondary);
   font-size: 14px;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
 }
 
 input[type='text'],
@@ -445,7 +443,6 @@ input::placeholder {
 .look-controls span {
   text-align: center;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
 }
 
 .lobby-form {
@@ -498,7 +495,6 @@ input::placeholder {
   font-family: var(--font-display);
   font-size: 13px;
   color: var(--gold-text);
-  letter-spacing: 0.05em;
 }
 
 .topbar-title {
@@ -868,7 +864,6 @@ input::placeholder {
   font-size: 15px;
   color: var(--secondary);
   margin: 0 0 12px;
-  letter-spacing: 0.04em;
 }
 
 .panel-head {
@@ -980,7 +975,6 @@ input::placeholder {
   font-size: 13px;
   color: var(--secondary);
   text-transform: uppercase;
-  letter-spacing: 0.08em;
 }
 
 .res-tile .v {
@@ -1239,7 +1233,6 @@ input::placeholder {
   font-size: 12px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
 }
 
 :root[data-font='normal'] .round-chip {
@@ -1250,7 +1243,6 @@ input::placeholder {
 :root[data-font='normal'] .lobby-brand h1 {
   font-weight: 800;
   font-size: clamp(28px, 6vw, 42px);
-  letter-spacing: -0.01em;
 }
 
 :root[data-font='normal'] .btn-big {
@@ -1495,7 +1487,6 @@ input::placeholder {
   font-family: var(--font-display);
   font-size: 12px;
   text-transform: uppercase;
-  letter-spacing: 0.1em;
 }
 
 .chat-divider::before,
