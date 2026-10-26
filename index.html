@@ -8,11 +8,11 @@
     <meta name="theme-color" content="#16132a" />
     <meta name="referrer" content="no-referrer" />
     <!-- CSP_START: npm run bump rewrites the importmap hash -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'sha256-MxXrqQfZntvg9jhgGM1rDifQy6RqulRjKbFxJcOFQI4='; style-src 'self'; font-src 'self'; img-src 'self' data:; connect-src wss://broker.hivemq.com:8884 wss://broker.emqx.io:8084 wss://test.mosquitto.org:8081; worker-src blob:; base-uri 'none'; form-action 'none'" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'sha256-QPWVr2jBfEBzhggEUEnNqHykuX0rTJPQ7oY28Jg1vfA='; style-src 'self'; font-src 'self'; img-src 'self' data:; connect-src wss://broker.hivemq.com:8884 wss://broker.emqx.io:8084 wss://test.mosquitto.org:8081; worker-src blob:; base-uri 'none'; form-action 'none'" />
     <!-- CSP_END -->
     <link rel="icon" type="image/svg+xml" href="assets/mark.svg" />
-    <link rel="stylesheet" href="css/style.css?v=40" />
-    <script src="js/boot.js?v=40"></script>
+    <link rel="stylesheet" href="css/style.css?v=41" />
+    <script src="js/boot.js?v=41"></script>
   </head>
   <body>
     <!-- ============ LOBBY ============ -->
@@ -71,7 +71,7 @@
         <div class="topbar-actions">
           <span id="conn" class="conn" title="Connection"></span>
           <button type="button" class="btn btn-primary" id="invite">Copy invite link</button>
-          <button type="button" class="btn" id="qr" title="Show a QR code to join from a phone" aria-expanded="false" aria-controls="qr-pop">QR</button>
+          <button type="button" class="btn" id="qr" title="Show a QR code to join from a phone" aria-haspopup="dialog">QR</button>
           <button type="button" class="btn btn-icon settings-btn" aria-label="Settings" title="Settings" aria-haspopup="menu" aria-expanded="false"></button>
           <button type="button" class="btn" id="leave">Leave</button>
         </div>
@@ -148,12 +148,17 @@
     <div id="settings-menu" class="settings-menu pixel-box" role="menu" aria-label="Settings" hidden></div>
     <div id="toasts" class="toasts" aria-live="polite"></div>
 
-    <div id="qr-pop" class="qr-pop pixel-box" hidden>
+    <dialog id="qr-pop" class="modal qr-modal pixel-box" aria-labelledby="qr-title">
+      <h2 id="qr-title">Join from a phone</h2>
       <canvas id="qr-canvas" class="qr-canvas" width="33" height="33" aria-label="QR code of the invite link"></canvas>
-      <p>Scan to join from a phone</p>
-    </div>
+      <p>Point the phone camera at the code to take a seat.</p>
+      <div class="recap-actions">
+        <button type="button" class="btn" id="qr-expand">Expand</button>
+        <button type="button" class="btn btn-primary" id="qr-close">Close</button>
+      </div>
+    </dialog>
 
-    <dialog id="recap" class="recap pixel-box" aria-labelledby="recap-title">
+    <dialog id="recap" class="modal recap pixel-box" aria-labelledby="recap-title">
       <header class="recap-head">
         <img src="assets/mark.svg" alt="" width="40" height="40" />
         <div>
@@ -179,20 +184,20 @@
     <script type="importmap">
       {
         "imports": {
-          "./js/main.js": "./js/main.js?v=40",
-          "./js/net.js": "./js/net.js?v=40",
-          "./js/scene.js": "./js/scene.js?v=40",
-          "./js/sprites.js": "./js/sprites.js?v=40",
-          "./js/stats.js": "./js/stats.js?v=40",
-          "./js/audio.js": "./js/audio.js?v=40",
-          "./js/room-name.js": "./js/room-name.js?v=40",
-          "./js/season.js": "./js/season.js?v=40",
-          "./js/recap.js": "./js/recap.js?v=40",
-          "./vendor/mqtt.esm.js": "./vendor/mqtt.esm.js?v=40",
-          "./vendor/qrcode.mjs": "./vendor/qrcode.mjs?v=40"
+          "./js/main.js": "./js/main.js?v=41",
+          "./js/net.js": "./js/net.js?v=41",
+          "./js/scene.js": "./js/scene.js?v=41",
+          "./js/sprites.js": "./js/sprites.js?v=41",
+          "./js/stats.js": "./js/stats.js?v=41",
+          "./js/audio.js": "./js/audio.js?v=41",
+          "./js/room-name.js": "./js/room-name.js?v=41",
+          "./js/season.js": "./js/season.js?v=41",
+          "./js/recap.js": "./js/recap.js?v=41",
+          "./vendor/mqtt.esm.js": "./vendor/mqtt.esm.js?v=41",
+          "./vendor/qrcode.mjs": "./vendor/qrcode.mjs?v=41"
         }
       }
     </script>
-    <script type="module" src="js/main.js?v=40"></script>
+    <script type="module" src="js/main.js?v=41"></script>
   </body>
 </html>

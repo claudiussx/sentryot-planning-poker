@@ -1010,10 +1010,10 @@ function wireRoomControls() {
   $('#next').onclick = nextRound;
   $('#revote').onclick = revote;
   $('#poke').onclick = poke;
-  $('#qr').onclick = (e) => {
-    e.stopPropagation();
-    toggleQr();
-  };
+  $('#qr').onclick = openQr;
+  $('#qr-close').onclick = () => $('#qr-pop').close();
+  $('#qr-expand').onclick = () => setQrBig(!$('#qr-pop').classList.contains('is-big'));
+  $('#qr-pop').addEventListener('close', () => setQrBig(false));
   $('#recap-close').onclick = () => $('#recap').close();
   $('#recap-copy').onclick = () => copyText(recapText(), 'Recap copied');
   $('#chat-pill').onclick = jumpToLatestChat;
@@ -1219,13 +1219,11 @@ function wireSettings() {
     // a clicked menu item is redrawn (and so detached) by the time this runs: that is not an outside click
     if (e.target.isConnected && !e.target.closest('#settings-menu')) closeSettings();
     if (e.target.isConnected && !e.target.closest('#emoji-panel, #emoji-btn')) toggleEmojiPanel(false);
-    if (e.target.isConnected && !e.target.closest('#qr-pop, #qr') && $('#qr-pop')) toggleQr(false);
   });
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
       closeSettings({ refocus: true });
       toggleEmojiPanel(false);
-      if ($('#qr-pop')) toggleQr(false);
     }
   });
   window.addEventListener('resize', () => closeSettings());
@@ -1505,13 +1503,14 @@ function recapText() {
 
 // ---------- QR code of the invite link, drawn locally ----------
 
-function toggleQr(open = $('#qr-pop').hidden) {
-  const pop = $('#qr-pop');
-  $('#qr').setAttribute('aria-expanded', String(open));
-  if (!open) {
-    pop.hidden = true;
-    return;
-  }
+function setQrBig(big) {
+  $('#qr-pop').classList.toggle('is-big', big);
+  $('#qr-expand').textContent = big ? 'Shrink' : 'Expand';
+}
+
+// a centred dialog like the recap; being modal, the settings menu cannot be open with it
+function openQr() {
+  closeSettings();
   const qr = qrcode(0, 'M');
   qr.addData(location.href);
   qr.make();
@@ -1525,7 +1524,7 @@ function toggleQr(open = $('#qr-pop').hidden) {
   ctx.fillRect(0, 0, c.width, c.height);
   ctx.fillStyle = '#0d0b1a';
   for (let y = 0; y < n; y++) for (let x = 0; x < n; x++) if (qr.isDark(y, x)) ctx.fillRect(x + quiet, y + quiet, 1, 1);
-  pop.hidden = false;
+  $('#qr-pop').showModal();
 }
 
 // ============================================================

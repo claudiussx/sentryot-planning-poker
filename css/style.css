@@ -1711,35 +1711,41 @@ input::placeholder {
 
 /* ---------- QR code popover ---------- */
 
-.qr-pop {
-  position: fixed;
-  z-index: 20;
-  top: 72px;
-  right: 16px;
-  padding: 12px;
-  display: grid;
-  justify-items: center;
-  gap: 8px;
-  background: var(--menu-bg);
-  box-shadow:
-    0 -4px 0 0 var(--border-light),
-    0 4px 0 0 var(--border-light),
-    -4px 0 0 0 var(--border-light),
-    4px 0 0 0 var(--border-light),
-    0 16px 32px var(--shadow);
-}
-
-.qr-pop[hidden] {
-  display: none;
-}
-
 .qr-canvas {
-  width: 220px;
-  height: 220px;
+  display: block;
+  margin: 0 auto 10px;
+  width: 240px;
+  height: 240px;
   image-rendering: pixelated;
 }
 
-.qr-pop p {
+.qr-modal {
+  width: min(320px, calc(100vw - 32px));
+  text-align: center;
+}
+
+.qr-modal h2 {
+  margin: 0 0 14px;
+  font-family: var(--font-display);
+  font-size: 22px;
+  color: var(--gold-text);
+}
+
+.qr-modal .recap-actions {
+  justify-content: center;
+}
+
+/* expanded: the code fills the screen, for a meeting room display */
+.qr-modal.is-big {
+  width: min(92vw, calc(92vh - 120px));
+}
+
+.qr-modal.is-big .qr-canvas {
+  width: min(84vw, calc(92vh - 200px));
+  height: min(84vw, calc(92vh - 200px));
+}
+
+.qr-modal p {
   margin: 0;
   font-size: 14px;
   color: var(--secondary);
@@ -1752,10 +1758,9 @@ input::placeholder {
   width: 100%;
 }
 
-.recap {
+.modal {
   /* the page reset zeroes margins; a modal dialog centres itself with auto ones */
   margin: auto;
-  width: min(520px, calc(100vw - 32px));
   max-height: calc(100vh - 32px);
   overflow: auto;
   padding: 20px;
@@ -1764,8 +1769,19 @@ input::placeholder {
   background: linear-gradient(180deg, var(--accent-15), transparent 40%), var(--panel);
 }
 
-.recap::backdrop {
-  background: rgb(8 6 18 / 70%);
+.recap {
+  width: min(520px, calc(100vw - 32px));
+}
+
+/* the page stays put behind the settings menu and the dialogs */
+html:has(#settings-menu:not([hidden])),
+html:has(dialog[open]) {
+  overflow: hidden;
+}
+
+.modal::backdrop {
+  background: rgb(8 6 18 / 55%);
+  backdrop-filter: blur(6px);
 }
 
 .recap-head {
