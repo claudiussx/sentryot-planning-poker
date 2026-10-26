@@ -7,7 +7,7 @@
     root.dataset.theme = theme;
     if (localStorage.getItem('sop.font') === 'normal') root.dataset.font = 'normal';
     var motion = localStorage.getItem('sop.motion');
-    if (motion !== 'on' && motion !== 'off') motion = matchMedia('(prefers-reduced-motion: reduce)').matches ? 'off' : 'on';
+    if (motion !== 'on' && motion !== 'minimal' && motion !== 'off') motion = matchMedia('(prefers-reduced-motion: reduce)').matches ? 'minimal' : 'on';
     root.dataset.motion = motion;
   } catch (e) {
     root.dataset.theme = 'dark';

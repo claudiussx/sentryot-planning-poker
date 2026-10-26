@@ -1,7 +1,7 @@
 import { RoomClient, newToken, newId } from './net.js';
 import { Scene } from './scene.js';
 import { randomLook, sanitizeLook, drawPreview, drawIconCentered, setSceneTheme, EMOTES, EMOTE_NAMES, SHIRTS, HAIR_STYLES, HAIR_COLORS, SKINS, ACCESSORIES } from './sprites.js';
-import { DECK, computeStats, label, isNumeric } from './stats.js';
+import { DECK, computeStats, label } from './stats.js';
 import { play, isMuted, setMuted } from './audio.js';
 import { roomSlug, parseRoomHash } from './room-name.js';
 
@@ -10,7 +10,8 @@ const STALE_MS = 130_000; // no heartbeat for this long: the seat goes to sleep
 const OFFLINE_MAX_MS = 20 * 60_000; // asleep this long without coming back: the seat is freed
 const HEARTBEAT_MS = 20_000;
 const HOST_GRACE_MS = 5_000; // let a refreshing host come back before someone else takes over
-const MAX_HISTORY = 30;
+const MAX_CHAT = 100; // messages kept on screen; nothing is stored anywhere
+const MAX_CHAT_LENGTH = 200;
 const MAX_PEERS = 40; // more seats than any team has: beyond this it is someone flooding the room
 const EVENT_BURST = 8; // events one person may send in EVENT_WINDOW_MS before the rest are dropped
 const EVENT_WINDOW_MS = 4_000;
@@ -180,6 +181,8 @@ function setLobbyMode(mode) {
 
 async function onEnter(e) {
   e.preventDefault();
+  // a double click or an auto-rejoin racing a click must not open the room twice
+  if (state.entering || state.rc) return;
   const name = $('#name').value.trim().replace(/\s+/g, ' ').slice(0, 20);
   if (!name) return $('#name').focus();
   state.me.name = name;
@@ -192,6 +195,7 @@ async function onEnter(e) {
 
   const btn = $('#enter-btn');
   const err = $('#lobby-error');
+  state.entering = true;
   btn.disabled = true;
   err.hidden = true;
   const invite = parseHash();
@@ -217,6 +221,7 @@ async function onEnter(e) {
     err.textContent = 'Could not reach the relay. Check your connection and try again.';
     err.hidden = false;
   } finally {
+    state.entering = false;
     btn.disabled = false;
     btn.textContent = idle;
   }
@@ -249,7 +254,7 @@ async function enterRoom(rc, { creating, roomName }) {
 
   if (!state.scene) {
     state.scene = new Scene($('#stage'), { onSeatClick: throwAt });
-    state.scene.setStill(!motionOn());
+    state.scene.setMotion(motionMode());
     buildHand();
     buildEmotes();
     wireRoomControls();
@@ -271,7 +276,7 @@ async function enterRoom(rc, { creating, roomName }) {
   $('#conn').className = 'conn online';
 
   if (creating) {
-    state.room = { v: 1, seq: 1, name: roomName, hostId: state.me.id, round: 1, revealed: false, topic: '', final: null, timerEnd: null, autoReveal: false, history: [], createdAt: Date.now() };
+    state.room = { v: 1, seq: 1, name: roomName, hostId: state.me.id, round: 1, revealed: false, timerEnd: null, autoReveal: false, createdAt: Date.now() };
     rc.publishRoom(state.room);
     state.ready = true;
   } else {
@@ -351,7 +356,7 @@ function checkHost() {
   if (!state.room) {
     // empty room with no state at all (relay forgot it): start fresh
     if (effectiveHostId(list) === state.me.id) {
-      updateRoom({ v: 1, name: state.roomLabel || 'Planning room', hostId: state.me.id, round: 1, revealed: false, topic: '', final: null, timerEnd: null, autoReveal: false, history: [], createdAt: Date.now() });
+      updateRoom({ v: 1, name: state.roomLabel || 'Planning room', hostId: state.me.id, round: 1, revealed: false, timerEnd: null, autoReveal: false, createdAt: Date.now() });
     }
     return;
   }
@@ -502,24 +507,6 @@ const smallInt = (v, max) => Number.isInteger(v) && v >= 0 && v <= max;
 const str = (v, max) => (typeof v === 'string' ? v.slice(0, max) : '');
 
 // Room state comes from whoever holds the key: keep only known fields, in known shapes and sizes.
-function sanitizeEstimate(h) {
-  if (!h || typeof h !== 'object') return null;
-  const votes = Array.isArray(h.votes)
-    ? h.votes
-        .slice(0, MAX_PEERS)
-        .filter((v) => Array.isArray(v) && typeof v[0] === 'string' && DECK.includes(v[1]))
-        .map(([n, v]) => [n.slice(0, 20), v])
-    : [];
-  return {
-    round: smallInt(h.round, 1e6) ? h.round : 0,
-    topic: str(h.topic, 120),
-    final: DECK.includes(h.final) ? h.final : null,
-    average: Number.isFinite(h.average) ? h.average : null,
-    votes,
-    at: Number.isFinite(h.at) ? h.at : 0,
-  };
-}
-
 function sanitizeRoom(d) {
   if (!d || typeof d.hostId !== 'string' || !smallInt(d.round, 1e6) || !smallInt(d.seq, 1e9)) return null;
   return {
@@ -528,11 +515,8 @@ function sanitizeRoom(d) {
     hostId: d.hostId.slice(0, 16),
     round: d.round,
     revealed: !!d.revealed,
-    topic: str(d.topic, 120),
-    final: DECK.includes(d.final) ? d.final : null,
     timerEnd: Number.isFinite(d.timerEnd) ? d.timerEnd : null,
     autoReveal: !!d.autoReveal,
-    history: Array.isArray(d.history) ? d.history.slice(-MAX_HISTORY).map(sanitizeEstimate).filter(Boolean) : [],
     createdAt: Number.isFinite(d.createdAt) ? d.createdAt : 0,
     seq: d.seq,
   };
@@ -588,6 +572,12 @@ function onEvent(e) {
   } else if (e.type === 'emote' && EMOTES.includes(e.icon)) {
     state.scene.emote(e.from, e.icon);
     play('emote');
+  } else if (e.type === 'chat') {
+    const text = cleanChat(e.text);
+    if (!text) return;
+    addChat(state.peers.get(e.from), text);
+    state.scene.emote(e.from, 'talk');
+    play('emote');
   }
 }
 
@@ -642,32 +632,12 @@ function reveal() {
 function nextRound() {
   if (!amHost() || !state.room.revealed) return;
   const room = state.room;
-  const history = [...room.history];
-  if (room.revealed) {
-    const votes = allPlayers().filter((p) => p.vote != null);
-    const s = computeStats(votes);
-    // the host's pick, or the suggestion if they did not choose
-    const final = room.final ?? (s.suggested != null ? String(s.suggested) : null);
-    history.push({ round: room.round, topic: room.topic, final, average: s.average, votes: votes.map((v) => [v.name, v.vote]), at: Date.now() });
-  }
   state.myVote = null;
   state.myRound = room.round + 1;
   saveVote();
-  updateRoom({ ...room, round: room.round + 1, revealed: false, topic: '', final: null, timerEnd: null, history: history.slice(-MAX_HISTORY) });
-  $('#story-input').value = '';
+  updateRoom({ ...room, round: room.round + 1, revealed: false, timerEnd: null });
   play('round');
   publishPresence();
-}
-
-function setFinal(value) {
-  if (!amHost() || !state.room.revealed) return;
-  updateRoom({ ...state.room, final: value });
-  play('pick');
-}
-
-function removeEstimate(at) {
-  if (!amHost()) return;
-  updateRoom({ ...state.room, history: state.room.history.filter((h) => h.at !== at) });
 }
 
 function setTimer(sec) {
@@ -712,6 +682,47 @@ function throwAt(id) {
   state.rc.sendEvent({ type: 'throw', from: state.me.id, to: id });
 }
 
+// ---------- chat: encrypted like everything else, kept only on screen ----------
+
+// one line of plain text: no control or direction-changing characters, bounded length
+function cleanChat(text) {
+  if (typeof text !== 'string') return '';
+  return text
+    .replace(/[\u0000-\u001f\u007f\u200b-\u200f\u202a-\u202e\u2066-\u2069]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, MAX_CHAT_LENGTH);
+}
+
+function sendChat(raw) {
+  const text = cleanChat(raw);
+  if (!text || !state.rc) return;
+  addChat({ ...state.me, isMe: true }, text);
+  state.scene.emote(state.me.id, 'talk');
+  state.rc.sendEvent({ type: 'chat', from: state.me.id, text });
+}
+
+function addChat(who, text) {
+  if (!who) return;
+  const log = $('#chat-log');
+  log.querySelector('.chat-empty')?.remove();
+  // stay at the bottom only if the reader already was there
+  const atBottom = log.scrollHeight - log.scrollTop - log.clientHeight < 40;
+  const li = el('li', `chat-msg${who.isMe ? ' is-me' : ''}`);
+  const dot = el('span', 'p-dot');
+  dot.style.background = SHIRTS[who.look?.shirt ?? 0];
+  const time = new Date();
+  li.append(
+    dot,
+    el('span', 'chat-name', who.isMe ? 'You' : who.name),
+    el('span', 'chat-time', `${String(time.getHours()).padStart(2, '0')}:${String(time.getMinutes()).padStart(2, '0')}`),
+    el('span', 'chat-text', text),
+  );
+  log.append(li);
+  while (log.children.length > MAX_CHAT) log.firstElementChild.remove();
+  if (atBottom || who.isMe) log.scrollTop = log.scrollHeight;
+}
+
 function sendEmote(icon) {
   state.scene.emote(state.me.id, icon);
   play('emote');
@@ -743,14 +754,6 @@ async function copyText(text, okMsg) {
   } catch {
     window.prompt('Copy this:', text);
   }
-}
-
-// What the team agreed, ready to paste into the backlog tool.
-function estimatesText() {
-  const items = state.room?.history || [];
-  const lines = items.map((h) => `- ${h.topic || `Round ${h.round}`}: ${h.final ? label(h.final) : '-'}`);
-  const total = items.reduce((sum, h) => sum + (isNumeric(h.final) ? Number(h.final) : 0), 0);
-  return `${state.room?.name || 'Planning'} - ${new Date().toISOString().slice(0, 10)}\n${lines.join('\n') || 'Nothing estimated yet'}\nTotal: ${total} points`;
 }
 
 // ---------- wiring ----------
@@ -806,29 +809,17 @@ function wireRoomControls() {
   $('#leave').onclick = leaveRoom;
   $('#reveal').onclick = reveal;
   $('#next').onclick = nextRound;
-  $('#copy-estimates').onclick = () => copyText(estimatesText(), 'Estimates copied');
+  $('#chat-form').onsubmit = (e) => {
+    e.preventDefault();
+    sendChat($('#chat-input').value);
+    $('#chat-input').value = '';
+  };
   document.querySelectorAll('[data-timer]').forEach((b) => (b.onclick = () => setTimer(Number(b.dataset.timer))));
   $('#auto-reveal').onchange = (e) => {
     if (amHost()) {
       updateRoom({ ...state.room, autoReveal: e.target.checked });
       maybeAutoReveal();
     }
-  };
-  let storyTimer = 0;
-  const commitStory = (value) => {
-    clearTimeout(storyTimer);
-    const topic = value.trim().slice(0, 120);
-    if (amHost() && topic !== state.room.topic) updateRoom({ ...state.room, topic });
-  };
-  $('#story-input').oninput = (e) => {
-    // read the value now: a re-render may rewrite the field before the timer fires
-    const value = e.target.value;
-    clearTimeout(storyTimer);
-    storyTimer = setTimeout(() => commitStory(value), 350);
-  };
-  $('#story-input').onblur = (e) => commitStory(e.target.value);
-  $('#story-input').onkeydown = (e) => {
-    if (e.key === 'Enter') e.target.blur();
   };
   document.addEventListener('visibilitychange', () => {
     publishPresence();
@@ -849,7 +840,9 @@ function wireRoomControls() {
 // ---------- settings: everything that is a preference lives behind the gear ----------
 
 const root = document.documentElement;
-const motionOn = () => root.dataset.motion !== 'off';
+// 'on' (full), 'minimal' or 'off'
+const motionMode = () => (['minimal', 'off'].includes(root.dataset.motion) ? root.dataset.motion : 'on');
+const motionOn = () => motionMode() !== 'off';
 
 // raw strings, not JSON: js/boot.js reads them before the modules load
 function saveRaw(key, value) {
@@ -907,11 +900,12 @@ const SETTINGS = [
   {
     icon: () => (motionOn() ? 'wave' : 'pause'),
     label: () => 'Motion',
-    value: () => (motionOn() ? 'On' : 'Off'),
+    value: () => ({ on: 'Full', minimal: 'Minimal', off: 'Off' })[motionMode()],
+    // cycles Full -> Minimal -> Off
     toggle: () => {
-      root.dataset.motion = motionOn() ? 'off' : 'on';
+      root.dataset.motion = { on: 'minimal', minimal: 'off', off: 'on' }[motionMode()];
       saveRaw('sop.motion', root.dataset.motion);
-      state.scene?.setStill(!motionOn());
+      state.scene?.setMotion(motionMode());
     },
   },
 ];
@@ -1038,13 +1032,6 @@ function render() {
   $('#room-title').textContent = room?.name || 'Planning room';
   document.title = `${room?.name || 'Planning'} · Pixel Poker`;
   $('#round-no').textContent = room?.round ?? '-';
-  // the host types the story right next to the round number; everyone else reads it there
-  const story = $('#story-text');
-  story.hidden = host;
-  story.textContent = room?.topic || 'Waiting for the host to name the story';
-  story.title = room?.topic || ''; // long names are cut to two lines; the full text is on hover
-  story.classList.toggle('is-empty', !room?.topic);
-  $('#story-input').hidden = !host;
   renderStatus();
 
   // host bar
@@ -1056,8 +1043,6 @@ function render() {
     $('#next').hidden = !room.revealed;
   }
   if (host) {
-    const input = $('#story-input');
-    if (document.activeElement !== input) input.value = room.topic || '';
     $('#auto-reveal').checked = !!room.autoReveal;
     document.querySelectorAll('[data-timer]').forEach((b) => {
       b.disabled = room.revealed;
@@ -1082,7 +1067,7 @@ function render() {
 
   renderPlayers(players, host);
   renderResults(room, stats, allIn);
-  renderEstimates(room, host);
+
 }
 
 function renderPlayers(players, host) {
@@ -1141,8 +1126,7 @@ function el(tag, cls, text) {
 function renderResults(room, s, allIn) {
   const box = $('#results');
   const show = !!room?.revealed;
-  const host = amHost();
-  const key = show ? JSON.stringify([room.round, s, room.final, host]) : '';
+  const key = show ? JSON.stringify([room.round, s]) : '';
   if (box.dataset.key === key) return;
   box.dataset.key = key;
   box.hidden = !show;
@@ -1185,58 +1169,10 @@ function renderResults(room, s, allIn) {
   }
   box.append(dist);
 
-  // the number that goes on the ticket: the host picks it, the suggestion until they do
-  const final = room.final ?? (s.suggested != null ? String(s.suggested) : null);
-  const pick = el('div', 'final-pick');
-  pick.append(el('span', 'k', host ? 'Final estimate (pick one)' : 'Final estimate'));
-  if (host) {
-    const opts = el('div', 'final-opts');
-    for (const v of DECK.filter((d) => isNumeric(d))) {
-      const b = el('button', `final-opt${v === final ? ' is-on' : ''}`, label(v));
-      b.type = 'button';
-      b.setAttribute('aria-pressed', String(v === final));
-      b.onclick = () => setFinal(v);
-      opts.append(b);
-    }
-    pick.append(opts);
-  } else {
-    pick.append(el('span', 'final-value', final ? label(final) : '-'));
-  }
-  box.append(pick);
-
   if (s.consensus && allIn) box.append(el('div', 'res-note is-good', 'Consensus! Everyone agrees. Ship it.'));
   else if (s.spread) box.append(el('div', 'res-note is-warn', `Big spread: ${s.spread.low.name} (${label(s.spread.low.vote)}) and ${s.spread.high.name} (${label(s.spread.high.vote)}), tell us what you see.`));
   if (s.coffee) box.append(el('div', 'res-note', `${s.coffee} ${s.coffee === 1 ? 'person needs' : 'people need'} a coffee break.`));
-  if (s.unsure) box.append(el('div', 'res-note', `${s.unsure} not sure. Maybe the story needs more detail.`));
-}
-
-// Each finished round leaves one line: the story and the points the team settled on.
-function renderEstimates(room, host) {
-  const ol = $('#estimates');
-  const items = room?.history || [];
-  const total = items.reduce((sum, h) => sum + (isNumeric(h.final) ? Number(h.final) : 0), 0);
-  $('#estimates-total').textContent = items.length ? `${total} pts` : '';
-  const key = JSON.stringify([items.map((h) => [h.at, h.final]), host]);
-  if (ol.dataset.key === key) return;
-  ol.dataset.key = key;
-  ol.innerHTML = '';
-  if (!items.length) {
-    ol.append(el('li', 'estimates-empty', 'Stories you finish show up here with their final points, ready to copy into the backlog.'));
-    return;
-  }
-  for (const h of [...items].reverse()) {
-    const li = el('li');
-    li.append(el('span', 'e-story', h.topic || `Round ${h.round}`), el('span', 'e-points', h.final ? label(h.final) : '-'));
-    if (host) {
-      const x = el('button', 'e-remove', 'x');
-      x.type = 'button';
-      x.title = 'Remove this line';
-      x.setAttribute('aria-label', `Remove ${h.topic || `round ${h.round}`}`);
-      x.onclick = () => removeEstimate(h.at);
-      li.append(x);
-    }
-    ol.append(li);
-  }
+  if (s.unsure) box.append(el('div', 'res-note', `${s.unsure} not sure. Maybe it needs more detail.`));
 }
 
 // ============================================================

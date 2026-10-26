@@ -28,6 +28,7 @@ export class Scene {
     this.balls = [];
     this.room = { revealed: false, consensus: false, timerEnd: null };
     this.still = false;
+    this.calm = false;
     this.stars = Array.from({ length: 14 }, (_, i) => {
       const r = rng(i + 11);
       return { x: r(), y: r(), p: r() * 3000 };
@@ -207,7 +208,7 @@ export class Scene {
   confetti() {
     if (this.still) return;
     const now = performance.now();
-    for (let i = 0; i < 110; i++) {
+    for (let i = 0; i < (this.calm ? 40 : 110); i++) {
       this.particles.push({
         x: Math.random() * this.LW,
         y: -Math.random() * 30,
@@ -226,10 +227,14 @@ export class Scene {
 
   // ---------- drawing ----------
 
-  // Motion off: time stands still for everything decorative, and state changes
+  // Motion 'off': time stands still for everything decorative, and state changes
   // (voting, reveal, joining) jump straight to their end pose.
-  setStill(still) {
+  // Motion 'minimal': the room lives (window, plant, paper balls) but people move
+  // at half speed with smaller hops, and the ceiling lights hold still.
+  setMotion(mode) {
+    const still = mode === 'off';
     this.still = still;
+    this.calm = mode === 'minimal';
     if (still) {
       this.particles = [];
       this.balls = [];
@@ -256,7 +261,7 @@ export class Scene {
     // string lights
     for (let x = 4, i = 0; x < LW; x += 9, i++) {
       R(ctx, x, 3 + (i % 2), 3, 1, PAL.border);
-      const on = Math.floor(t / 600 + i) % 3 !== 0;
+      const on = this.calm || Math.floor(t / 600 + i) % 3 !== 0;
       R(ctx, x + 1, 4 + (i % 2), 1, 2, on ? CONFETTI[i % 5] : PAL.border);
     }
 
@@ -371,8 +376,11 @@ export class Scene {
     }
     const { cx, dy } = seat;
     const still = this.still;
+    const calm = this.calm;
+    // people keep their own clock: at half speed in minimal motion
+    const tp = calm ? t / 2 : t;
     const join = still ? 1 : Math.min(1, (now - a.joinT) / 450);
-    let bob = still ? 0 : Math.round((1 - join) * 26) + (Math.floor((t + a.seed * 13) / 700) % 2 ? 0 : -1);
+    let bob = still ? 0 : Math.round((1 - join) * 26) + (Math.floor((tp + a.seed * 13) / 700) % 2 ? 0 : -1);
 
     let pose;
     let raise = 1;
@@ -380,10 +388,10 @@ export class Scene {
     if (p.spectator) pose = 'spectator';
     else if (revealed) {
       if (p.vote != null) {
-        raise = still ? 1 : Math.max(0, (now - a.revealT) / 380);
+        raise = still ? 1 : Math.max(0, (now - a.revealT) / (calm ? 700 : 380));
         pose = consensus && raise >= 1 ? 'cheer' : 'reveal';
         if (!still && raise > 0.7 && raise < 1.3) bob -= 2;
-        if (pose === 'cheer') bob = still ? 0 : -Math.round(Math.abs(Math.sin((t + i * 160) / 170)) * 4);
+        if (pose === 'cheer') bob = still ? 0 : -Math.round(Math.abs(Math.sin((tp + i * 160) / 170)) * (calm ? 2 : 4));
       } else pose = 'shrug';
     } else if (p.voted) {
       pose = !still && now - a.scribbleStart < 1300 ? 'scribble' : 'voted';
@@ -404,19 +412,19 @@ export class Scene {
       dy,
       look: p.look,
       pose,
-      t,
+      t: tp,
       seed: a.seed,
       bob,
       raise,
       value: p.vote,
       face,
       crown: p.isHost,
-      thinkPhase: ((t + a.seed * 53) % 6000) / 6000,
+      thinkPhase: ((tp + a.seed * 53) % 6000) / 6000,
       paper: pose === 'spectator' || pose === 'reveal' || pose === 'cheer' ? null : { face: paperFace, scribble, seed: a.seed + a.pick },
     });
 
     const hy = dy - 24 + bob;
-    const badgeY = hy - 15 + (Math.floor(t / 400) % 2 ? 0 : -1);
+    const badgeY = hy - 15 + (calm || Math.floor(t / 400) % 2 ? 0 : -1);
     if (pose === 'voted') drawBadgeCheck(ctx, cx - 4, badgeY);
     if (pose === 'spectator' && !a.emote) {
       drawEmoteBubble(ctx, 'eye', cx + 5, hy - 13);
@@ -439,7 +447,7 @@ export class Scene {
 
     if (p.isMe && !revealed) {
       // a little floor arrow under my seat
-      const ay = dy + 21 + (Math.floor(t / 350) % 2);
+      const ay = dy + 21 + (calm ? 0 : Math.floor(t / 350) % 2);
       R(ctx, cx - 2, ay + 2, 5, 1, PAL.teal);
       R(ctx, cx - 1, ay + 1, 3, 1, PAL.teal);
       R(ctx, cx, ay, 1, 1, PAL.teal);
