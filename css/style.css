@@ -591,22 +591,6 @@ input::placeholder {
   color: var(--text);
 }
 
-.host-bar {
-  display: flex;
-  align-items: center;
-  gap: 10px 14px;
-  padding: 12px 16px;
-  flex-wrap: wrap;
-  background: linear-gradient(90deg, var(--accent-15), transparent 60%), var(--panel);
-}
-
-.host-tag {
-  font-family: var(--font-display);
-  font-size: 13px;
-  color: var(--gold-text);
-  width: 100%;
-}
-
 .timer-group {
   display: flex;
   align-items: center;
@@ -630,7 +614,26 @@ input::placeholder {
 
 .host-actions {
   display: flex;
+  align-items: center;
+  justify-content: flex-end;
   flex-wrap: wrap;
+  gap: 4px 14px;
+}
+
+.host-tools {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px 14px;
+}
+
+.host-chip {
+  font-family: var(--font-display);
+  font-size: 13px;
+  color: var(--ink);
+  background: var(--gold);
+  padding: 4px 8px;
+  white-space: nowrap;
 }
 
 .stage {
@@ -1145,10 +1148,6 @@ input::placeholder {
     order: 5;
   }
 
-  .host-bar {
-    order: 6;
-  }
-
   .side-col > .panel:not(.results) {
     order: 7;
   }
@@ -1235,7 +1234,7 @@ input::placeholder {
 
 /* the pixel display font runs wide, so plain text needs a bump to keep the same weight on the page */
 :root[data-font='normal'] .topbar-kicker,
-:root[data-font='normal'] .host-tag,
+:root[data-font='normal'] .host-chip,
 :root[data-font='normal'] .panel h2 {
   font-size: 12px;
   font-weight: 700;
@@ -1333,13 +1332,8 @@ input::placeholder {
     min-height: 140px;
   }
 
-  .round-bar,
-  .host-bar {
+  .round-bar {
     padding: 8px 14px;
-  }
-
-  .host-tag {
-    width: auto;
   }
 
   .emote-btn {

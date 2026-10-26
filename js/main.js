@@ -1150,11 +1150,12 @@ function render() {
   $('#round-no').textContent = room?.round ?? '-';
   renderStatus();
 
-  // host bar
-  $('#host-bar').hidden = !host;
+  // host tools live in the round bar: while voting the timer, auto-show and Show votes,
+  // after the reveal only New round, so the next step is always the obvious one
   $('#host-actions').hidden = !host;
+  $('#host-chip').hidden = !host;
   if (host) {
-    // one step at a time: show the votes, then move on
+    $('#host-tools').hidden = room.revealed;
     $('#reveal').hidden = room.revealed;
     $('#next').hidden = !room.revealed;
   }
