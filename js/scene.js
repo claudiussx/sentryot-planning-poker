@@ -1,6 +1,6 @@
 // The planning room: wall, desks, characters and effects on one low-res canvas,
 // with a DOM overlay for crisp name plates and click targets.
-import { PAL, R, drawCharacter, drawChair, drawDesk, drawLogo, drawText, textWidth, drawIcon, drawBubble, drawBadgeCheck, seedOf, rng, shade } from './sprites.js';
+import { PAL, R, drawCharacter, drawChair, drawDesk, drawLogo, drawText, textWidth, drawIcon, drawEmoteBubble, drawBadgeCheck, seedOf, rng, shade } from './sprites.js';
 
 const SW = 46; // seat width
 const WH = 50; // wall height
@@ -177,6 +177,7 @@ export class Scene {
       el.classList.toggle('is-me', !!p.isMe);
       el.classList.toggle('is-spectator', !!p.spectator);
       el.classList.toggle('is-host', !!p.isHost);
+      el.classList.toggle('is-offline', !!p.offline);
       el.disabled = !!p.isMe;
       el.querySelector('.plate-name').textContent = p.name;
       el.title = p.isMe ? `${p.name} (you)` : `Throw a paper ball at ${p.name}`;
@@ -351,7 +352,7 @@ export class Scene {
       } else pose = 'shrug';
     } else if (p.voted) {
       pose = now - a.scribbleStart < 1300 ? 'scribble' : 'voted';
-    } else if (p.away) pose = 'away';
+    } else if (p.away || p.offline) pose = 'away';
     else pose = 'think';
 
     const hit = now - a.hitT;
@@ -383,8 +384,7 @@ export class Scene {
     const badgeY = hy - 15 + (Math.floor(t / 400) % 2 ? 0 : -1);
     if (pose === 'voted') drawBadgeCheck(ctx, cx - 4, badgeY);
     if (pose === 'spectator' && !a.emote) {
-      drawBubble(ctx, cx + 5, hy - 12, 11, 10);
-      drawIcon(ctx, 'eye', cx + 7, hy - 11);
+      drawEmoteBubble(ctx, 'eye', cx + 5, hy - 12);
     }
 
     let bubble = null;
@@ -396,8 +396,7 @@ export class Scene {
     if (bubble) {
       const pop = a.emote && now < a.emoteUntil ? Math.min(1, (2600 - (a.emoteUntil - now)) / 120) : 1;
       if (pop >= 1) {
-        drawBubble(ctx, cx + 5, hy - 13, 11, 10);
-        drawIcon(ctx, bubble, cx + 7, hy - 12);
+        drawEmoteBubble(ctx, bubble, cx + 5, hy - 13);
       } else {
         R(ctx, cx + 7, hy - 8, 4, 4, PAL.white);
       }

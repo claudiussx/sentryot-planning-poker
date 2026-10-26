@@ -36,6 +36,29 @@ async function sha256(text) {
   return new Uint8Array(await crypto.subtle.digest('SHA-256', enc.encode(text)));
 }
 
+// MQTT 3.1.1 PUBLISH, QoS 0, built by hand for leaveNow().
+function publishPacket(topic, payload, retain) {
+  const t = enc.encode(topic);
+  const body = 2 + t.length + payload.length;
+  const len = [];
+  let n = body;
+  do {
+    let b = n % 128;
+    n = Math.floor(n / 128);
+    if (n > 0) b |= 0x80;
+    len.push(b);
+  } while (n > 0);
+  const out = new Uint8Array(1 + len.length + body);
+  out[0] = 0x30 | (retain ? 1 : 0);
+  out.set(len, 1);
+  let o = 1 + len.length;
+  out[o++] = t.length >> 8;
+  out[o++] = t.length & 0xff;
+  out.set(t, o);
+  out.set(payload, o + t.length);
+  return out;
+}
+
 export class RoomClient extends EventTarget {
   constructor({ token, myId, brokers = BROKERS }) {
     super();
@@ -97,7 +120,7 @@ export class RoomClient extends EventTarget {
       this.urls.forEach((url, i) => {
         const client = connect(url, {
           clientId: `sop_${newId()}`,
-          keepalive: 20,
+          keepalive: 45,
           reconnectPeriod: 2500,
           connectTimeout: 8000,
           clean: true,
@@ -193,6 +216,30 @@ export class RoomClient extends EventTarget {
     return this.#publish('evt', { ...evt, eid: newId() }, false);
   }
 
+  // Sealing is async and a closing tab gets no second chance, so the goodbye is sealed ahead of time.
+  async prepareGoodbye(evt) {
+    this.goodbye = await this.seal({ ...evt, eid: newId() });
+  }
+
+  // Synchronous on purpose: runs from pagehide, where awaited work never finishes.
+  // mqtt.js queues writes asynchronously, so the packets go straight to the WebSocket,
+  // which browsers still flush while the page closes.
+  leaveNow() {
+    const empty = new Uint8Array(0);
+    this.clients.forEach((c, i) => {
+      if (!c || !this.online.has(i)) return;
+      const ws = c.stream?.socket;
+      if (ws instanceof WebSocket && ws.readyState === WebSocket.OPEN) {
+        if (this.goodbye) ws.send(publishPacket(`${this.base}/evt`, this.goodbye, false));
+        ws.send(publishPacket(`${this.base}/p/${this.myId}`, empty, true));
+        ws.send(new Uint8Array([0xe0, 0x00])); // DISCONNECT: we left on purpose
+      } else {
+        if (this.goodbye) c.publish(`${this.base}/evt`, this.goodbye, { qos: 0, retain: false });
+        c.publish(`${this.base}/p/${this.myId}`, empty, { qos: 0, retain: true });
+      }
+    });
+  }
+
   close() {
     for (const c of this.clients) c?.end(true);
     this.online.clear();
@@ -200,7 +247,7 @@ export class RoomClient extends EventTarget {
 
   async leave() {
     try {
-      await this.#publish(`p/${this.myId}`, null, true);
+      this.leaveNow();
     } finally {
       await Promise.all(this.clients.map((c) => c && new Promise((r) => c.end(false, {}, r))));
       this.online.clear();

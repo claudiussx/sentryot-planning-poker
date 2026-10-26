@@ -1,12 +1,13 @@
 import { RoomClient, newToken, newId } from './net.js';
 import { Scene } from './scene.js';
-import { randomLook, sanitizeLook, drawPreview, drawIcon, EMOTES, SHIRTS, HAIR_STYLES, HAIR_COLORS, SKINS, ACCESSORIES } from './sprites.js';
+import { randomLook, sanitizeLook, drawPreview, drawIconCentered, EMOTES, SHIRTS, HAIR_STYLES, HAIR_COLORS, SKINS, ACCESSORIES } from './sprites.js';
 import { DECK, computeStats, label } from './stats.js';
 import { play, isMuted, setMuted } from './audio.js';
 import { roomSlug, parseRoomHash } from './room-name.js';
 
 const $ = (sel) => document.querySelector(sel);
-const STALE_MS = 130_000; // presence older than this is a ghost
+const STALE_MS = 130_000; // no heartbeat for this long: the seat goes to sleep
+const OFFLINE_MAX_MS = 20 * 60_000; // asleep this long without coming back: the seat is freed
 const HEARTBEAT_MS = 20_000;
 const HOST_GRACE_MS = 5_000; // let a refreshing host come back before someone else takes over
 const MAX_HISTORY = 30;
@@ -270,13 +271,29 @@ async function enterRoom(rc, { creating, roomName }) {
   play('join');
   render();
 
-  clearInterval(state.heartbeat);
-  state.heartbeat = setInterval(() => {
+  state.heartbeat?.stop();
+  state.heartbeat = everyMs(HEARTBEAT_MS, () => {
     publishPresence();
     prunePeers();
-  }, HEARTBEAT_MS);
-  clearInterval(state.ticker);
-  state.ticker = setInterval(tickSecond, 1000);
+  });
+  state.ticker?.stop();
+  state.ticker = everyMs(1000, tickSecond);
+  rc.prepareGoodbye({ type: 'bye', from: state.me.id });
+}
+
+// Background tabs get their timers throttled to once a minute; a worker's timers keep their pace.
+function everyMs(ms, fn) {
+  try {
+    const src = `setInterval(() => postMessage(0), ${ms});`;
+    const url = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
+    const w = new Worker(url);
+    URL.revokeObjectURL(url);
+    w.onmessage = fn;
+    return { stop: () => w.terminate() };
+  } catch {
+    const id = setInterval(fn, ms);
+    return { stop: () => clearInterval(id) };
+  }
 }
 
 function allPlayers() {
@@ -299,9 +316,10 @@ function allPlayers() {
 }
 
 function effectiveHostId(list = allPlayers()) {
-  if (state.room && list.some((p) => p.id === state.room.hostId)) return state.room.hostId;
+  if (state.room && list.some((p) => p.id === state.room.hostId && !p.offline)) return state.room.hostId;
   if (!state.ready) return state.room?.hostId ?? null;
-  const sorted = [...list].sort((a, b) => a.joinedAt - b.joinedAt || (a.id < b.id ? -1 : 1));
+  // a sleeping seat cannot run the room
+  const sorted = list.filter((p) => !p.offline).sort((a, b) => a.joinedAt - b.joinedAt || (a.id < b.id ? -1 : 1));
   return sorted[0]?.id ?? null;
 }
 
@@ -319,7 +337,7 @@ function checkHost() {
     }
     return;
   }
-  const hostHere = list.some((p) => p.id === state.room.hostId);
+  const hostHere = list.some((p) => p.id === state.room.hostId && !p.offline);
   if (hostHere) {
     state.hostMissingSince = 0;
     return;
@@ -379,9 +397,13 @@ function sanitizePresence(d) {
 function onPresence(raw) {
   const p = sanitizePresence(raw);
   if (!p || p.id === state.me.id) return;
-  if (Date.now() - p.ts > STALE_MS) return;
+  if (Date.now() - p.ts > OFFLINE_MAX_MS) return;
   const known = state.peers.has(p.id);
   const prev = state.peers.get(p.id);
+  // someone back from another browser or device takes over their own sleeping seat
+  for (const [id, q] of state.peers) {
+    if (id !== p.id && q.offline && q.name.toLowerCase() === p.name.toLowerCase()) removePeer(id, { quiet: true });
+  }
   state.peers.set(p.id, { ...p, seenAt: Date.now() });
   const back = state.recentlyGone.get(p.id);
   state.recentlyGone.delete(p.id);
@@ -396,12 +418,23 @@ function onPresence(raw) {
   render();
 }
 
+// The relays dropped this person's connection. That also happens to a tab the
+// browser froze in the background, so keep the seat (asleep) until they come
+// back, say goodbye, or stay away too long.
 function onPresenceGone(id) {
+  const p = state.peers.get(id);
+  if (!p || p.offline) return;
+  p.offline = true;
+  p.offlineSince = Date.now();
+  render();
+}
+
+function removePeer(id, { quiet = false } = {}) {
   const p = state.peers.get(id);
   if (!p) return;
   state.peers.delete(id);
   state.recentlyGone.set(id, Date.now());
-  setTimeout(() => {
+  if (!quiet) setTimeout(() => {
     if (state.peers.has(id)) return;
     play('leave');
     toast(`${p.name} left the table`);
@@ -413,9 +446,12 @@ function prunePeers() {
   const now = Date.now();
   let changed = false;
   for (const [id, p] of state.peers) {
-    if (now - p.seenAt > STALE_MS) {
-      state.peers.delete(id);
+    if (!p.offline && now - p.seenAt > STALE_MS) {
+      p.offline = true;
+      p.offlineSince = now;
       changed = true;
+    } else if (p.offline && now - p.offlineSince > OFFLINE_MAX_MS) {
+      removePeer(id);
     }
   }
   if (changed) render();
@@ -466,6 +502,12 @@ function onRoom(raw) {
 
 function onEvent(e) {
   if (!e || typeof e.from !== 'string' || e.from === state.me.id || !state.peers.has(e.from)) return;
+  if (e.type === 'bye') return removePeer(e.from);
+  if (e.type === 'kick') {
+    // only the host clears a sleeping seat, and never ours: we are clearly here
+    if (typeof e.id === 'string' && e.id !== state.me.id && e.from === state.room?.hostId) removePeer(e.id);
+    return;
+  }
   if (e.type === 'throw' && typeof e.to === 'string') {
     state.scene.throwBall(e.from, e.to);
     play('throw');
@@ -494,7 +536,7 @@ function tickSecond() {
 function maybeAutoReveal() {
   const room = state.room;
   if (!room || room.revealed || !room.autoReveal || !amHost()) return;
-  const voters = allPlayers().filter((p) => !p.spectator);
+  const voters = allPlayers().filter((p) => !p.spectator && !p.offline);
   // no timer here: a host tab in the background gets its timers throttled, messages still arrive
   if (voters.length && voters.every((p) => p.voted)) reveal();
 }
@@ -566,6 +608,27 @@ function makeHost(id) {
   toast(`${state.peers.get(id)?.name || 'They'} is the host now`);
 }
 
+function removeSeat(id) {
+  if (!amHost()) return;
+  removePeer(id);
+  state.rc.sendEvent({ type: 'kick', from: state.me.id, id });
+}
+
+// Observers watch without a card; switching back gives them a hand again.
+function toggleRole() {
+  state.me.spectator = !state.me.spectator;
+  store.set('localStorage', 'sop.spectator', state.me.spectator);
+  if (state.me.spectator) {
+    state.myVote = null;
+    saveVote();
+  }
+  play('pick');
+  toast(state.me.spectator ? 'You are watching this one' : 'You are voting again');
+  publishPresence();
+  maybeAutoReveal();
+  render();
+}
+
 function throwAt(id) {
   if (id === state.me.id || !state.peers.has(id)) return;
   const now = Date.now();
@@ -589,8 +652,8 @@ async function leaveRoom() {
   } catch {
     /* ignore */
   }
-  clearInterval(state.heartbeat);
-  clearInterval(state.ticker);
+  state.heartbeat?.stop();
+  state.ticker?.stop();
   try {
     await state.rc?.leave();
   } catch (e) {
@@ -631,7 +694,7 @@ function buildHand() {
       const c = document.createElement('canvas');
       c.width = 8;
       c.height = 8;
-      drawIcon(c.getContext('2d'), 'coffee', 0, 0);
+      drawIconCentered(c.getContext('2d'), 'coffee', 0, 0, 8, 8);
       b.append(c);
       b.setAttribute('aria-label', 'Coffee break');
       b.title = 'I need a break';
@@ -657,7 +720,7 @@ function buildEmotes() {
     const c = document.createElement('canvas');
     c.width = 8;
     c.height = 8;
-    drawIcon(c.getContext('2d'), icon, icon === 'coffee' ? 0 : 0.5, icon === 'coffee' ? 0 : 0.5);
+    drawIconCentered(c.getContext('2d'), icon, 0, 0, 8, 8);
     b.append(c);
     b.onclick = () => sendEmote(icon);
     box.append(b);
@@ -667,6 +730,7 @@ function buildEmotes() {
 function wireRoomControls() {
   $('#invite').onclick = () => copyText(location.href, 'Invite link copied. Paste it in the team chat.');
   $('#leave').onclick = leaveRoom;
+  $('#role-toggle').onclick = toggleRole;
   $('#reveal').onclick = reveal;
   $('#next').onclick = nextRound;
   $('#copy-history').onclick = () => copyText(historyText(), 'Summary copied');
@@ -702,7 +766,9 @@ function wireRoomControls() {
     publishPresence();
     render();
   });
-  window.addEventListener('pagehide', () => state.rc?.leave());
+  window.addEventListener('pagehide', () => state.rc?.leaveNow());
+  // a frozen tab coming back: show we are here again straight away
+  window.addEventListener('focus', () => publishPresence());
   // back/forward cache restores a page whose relay sockets are already closed
   window.addEventListener('pageshow', (e) => e.persisted && location.reload());
   document.addEventListener('keydown', (e) => {
@@ -783,7 +849,7 @@ function toast(msg) {
 function renderStatus() {
   const room = state.room;
   const players = allPlayers();
-  const voters = players.filter((p) => !p.spectator);
+  const voters = players.filter((p) => !p.spectator && !p.offline);
   const voted = voters.filter((p) => p.voted).length;
   const host = players.find((p) => p.isHost);
   const line = $('#status-line');
@@ -844,6 +910,9 @@ function render() {
     c.classList.toggle('is-selected', !!room && state.myRound === room.round && c.dataset.value === state.myVote);
   });
   $('#hand').hidden = state.me.spectator;
+  const role = $('#role-toggle');
+  role.textContent = state.me.spectator ? 'Switch to voter' : 'Switch to observer';
+  role.title = state.me.spectator ? 'Take a card and vote' : 'Watch without voting';
 
   // scene
   const revealedVotes = players.filter((p) => p.vote != null);
@@ -888,14 +957,15 @@ function renderPlayers(players, host) {
     } else if (p.voted) {
       st.textContent = 'ready';
       st.classList.add('is-voted');
-    } else st.textContent = p.away ? 'away' : 'thinking';
+    } else st.textContent = p.offline ? 'asleep' : p.away ? 'away' : 'thinking';
     li.append(st);
     if (host && !p.isMe) {
       const b = document.createElement('button');
       b.type = 'button';
       b.className = 'btn btn-small';
-      b.textContent = 'Make host';
-      b.onclick = () => makeHost(p.id);
+      // a sleeping seat cannot take the room over, but the host can clear it
+      b.textContent = p.offline ? 'Remove' : 'Make host';
+      b.onclick = () => (p.offline ? removeSeat(p.id) : makeHost(p.id));
       li.append(b);
     }
     ul.append(li);
@@ -984,7 +1054,7 @@ function renderHistory(room) {
 // ============================================================
 
 // handy from the devtools console when something looks off
-window.sopDebug = () => ({ me: state.me, room: state.room, peers: [...state.peers.values()], myVote: state.myVote, myRound: state.myRound, ready: state.ready });
+window.sopDebug = () => ({ rc: state.rc, me: state.me, room: state.room, peers: [...state.peers.values()], myVote: state.myVote, myRound: state.myRound, ready: state.ready });
 
 (async function boot() {
   state.me.id = await resolveMyId();

@@ -214,6 +214,23 @@ export function drawLogo(ctx, x, y, s = 1) {
   });
 }
 
+export function iconSize(name) {
+  const rows = ICONS[name] || [];
+  return { w: Math.max(0, ...rows.map((r) => r.length)), h: rows.length };
+}
+
+// Draws an icon centred in a w x h box: icons differ in size, so a fixed corner sits them off-centre.
+export function drawIconCentered(ctx, name, x, y, w, h) {
+  const size = iconSize(name);
+  drawIcon(ctx, name, x + Math.floor((w - size.w) / 2), y + Math.floor((h - size.h) / 2));
+}
+
+// Speech bubble with an icon, 11 x 10 plus the tail.
+export function drawEmoteBubble(ctx, name, x, y) {
+  drawBubble(ctx, x, y, 11, 10);
+  drawIconCentered(ctx, name, x + 1, y + 1, 9, 8);
+}
+
 export function drawBubble(ctx, x, y, w, h) {
   R(ctx, x + 1, y, w - 2, h, PAL.ink);
   R(ctx, x, y + 1, w, h - 2, PAL.ink);

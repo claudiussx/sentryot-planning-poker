@@ -649,6 +649,10 @@ input::placeholder {
   vertical-align: middle;
 }
 
+.seat.is-offline .plate {
+  opacity: 0.55;
+}
+
 .seat.is-spectator .plate-name {
   color: var(--secondary);
   font-style: italic;
