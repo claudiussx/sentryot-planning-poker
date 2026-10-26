@@ -26,8 +26,8 @@ test('hash parsing: private token, named room, nothing', () => {
   assert.deepEqual(parseRoomHash('#r=aVCVSv6XqdH5-B6F'), { token: 'aVCVSv6XqdH5-B6F' });
   assert.deepEqual(parseRoomHash('#room=abcd'), { token: 'room:abcd', slug: 'abcd' });
   assert.deepEqual(parseRoomHash('#room=Sprint%2043'), { token: 'room:sprint-43', slug: 'sprint-43' });
-  // a short hand-typed r= is treated as a room name rather than ignored
-  assert.deepEqual(parseRoomHash('#r=abcd'), { token: 'room:abcd', slug: 'abcd' });
+  // a malformed private link is refused rather than opening a guessable named room
+  assert.equal(parseRoomHash('#r=abcd'), null);
   assert.equal(parseRoomHash(''), null);
   assert.equal(parseRoomHash('#foo=bar'), null);
 });

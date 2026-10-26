@@ -1,6 +1,6 @@
 // The planning room: wall, desks, characters and effects on one low-res canvas,
 // with a DOM overlay for crisp name plates and click targets.
-import { PAL, R, drawCharacter, drawChair, drawDesk, drawLogo, drawText, textWidth, drawIcon, drawEmoteBubble, drawBadgeCheck, seedOf, rng, shade } from './sprites.js';
+import { PAL, R, drawCharacter, drawChair, drawDesk, drawMark, drawText, SCENE, textWidth, drawIcon, drawEmoteBubble, drawBadgeCheck, seedOf, rng, shade } from './sprites.js';
 
 const SW = 46; // seat width
 const WH = 50; // wall height
@@ -231,8 +231,8 @@ export class Scene {
 
     // floor
     R(ctx, 0, WH, LW, this.LH - WH, PAL.wallDark);
-    for (let y = WH + 12; y < this.LH; y += 16) R(ctx, 0, y, LW, 1, PAL.panel);
-    for (let x = 8; x < LW; x += 24) R(ctx, x, WH, 1, this.LH - WH, PAL.panel);
+    for (let y = WH + 12; y < this.LH; y += 16) R(ctx, 0, y, LW, 1, PAL.floorLine);
+    for (let x = 8; x < LW; x += 24) R(ctx, x, WH, 1, this.LH - WH, PAL.floorLine);
 
     // string lights
     for (let x = 4, i = 0; x < LW; x += 9, i++) {
@@ -241,35 +241,50 @@ export class Scene {
       R(ctx, x + 1, 4 + (i % 2), 1, 2, on ? CONFETTI[i % 5] : PAL.border);
     }
 
-    // window with a night sky
+    // window: a starry night in the dark theme, a sunny day in the light one
     const wx = 8;
     const wy = 9;
     const ww = Math.min(44, Math.floor(LW / 4));
     R(ctx, wx - 2, wy - 2, ww + 4, 30, PAL.border);
-    R(ctx, wx, wy, ww, 26, '#0b1220');
-    R(ctx, wx + ww - 9, wy + 4, 5, 5, '#e8e3c8');
-    R(ctx, wx + ww - 8, wy + 4, 2, 2, '#0b1220');
-    for (const s of this.stars) {
-      const on = (t + s.p) % 3000 > 400;
-      if (on) R(ctx, wx + 1 + Math.floor(s.x * (ww - 12)), wy + 1 + Math.floor(s.y * 14), 1, 1, s.x > 0.6 ? PAL.cyan : PAL.white);
+    R(ctx, wx, wy, ww, 26, PAL.sky);
+    if (SCENE.light) {
+      R(ctx, wx + ww - 10, wy + 3, 6, 6, PAL.moon);
+      R(ctx, wx + ww - 11, wy + 5, 8, 2, PAL.moon);
+      R(ctx, wx + ww - 8, wy + 2, 2, 8, PAL.moon);
+      // clouds drift slowly across
+      for (const [i, cy] of [
+        [0, 4],
+        [1, 10],
+      ]) {
+        const cx = wx + ((Math.floor(t / 400) + i * 23) % (ww + 12)) - 8;
+        R(ctx, Math.max(wx, cx), wy + cy, Math.max(0, Math.min(8, wx + ww - cx)), 2, PAL.white);
+        R(ctx, Math.max(wx, cx + 2), wy + cy - 1, Math.max(0, Math.min(4, wx + ww - cx - 2)), 1, PAL.white);
+      }
+    } else {
+      R(ctx, wx + ww - 9, wy + 4, 5, 5, PAL.moon);
+      R(ctx, wx + ww - 8, wy + 4, 2, 2, PAL.sky);
+      for (const s of this.stars) {
+        const on = (t + s.p) % 3000 > 400;
+        if (on) R(ctx, wx + 1 + Math.floor(s.x * (ww - 12)), wy + 1 + Math.floor(s.y * 14), 1, 1, s.x > 0.6 ? PAL.cyan : PAL.white);
+      }
     }
-    // little skyline
+    // little skyline, lit windows at night
     for (let x = 0, i = 0; x < ww; i++) {
-      const bw = 4 + (i * 7) % 5;
-      const bh = 5 + (i * 13) % 9;
-      R(ctx, wx + x, wy + 26 - bh, Math.min(bw, ww - x), bh, '#141d2c');
-      if (i % 2) R(ctx, wx + x + 1, wy + 26 - bh + 2, 1, 1, PAL.gold);
+      const bw = 4 + ((i * 7) % 5);
+      const bh = 5 + ((i * 13) % 9);
+      R(ctx, wx + x, wy + 26 - bh, Math.min(bw, ww - x), bh, PAL.skyline);
+      if (i % 2 && !SCENE.light) R(ctx, wx + x + 1, wy + 26 - bh + 2, 1, 1, PAL.gold);
       x += bw + 1;
     }
     R(ctx, wx + Math.floor(ww / 2), wy, 1, 26, PAL.border);
     R(ctx, wx, wy + 13, ww, 1, PAL.border);
     R(ctx, wx - 3, wy + 26, ww + 6, 2, PAL.borderLight);
 
-    // SentryOT poster
+    // poster of the game's card
     const px = Math.floor(LW / 2) - 10;
     R(ctx, px - 1, 7, 22, 26, PAL.ink);
     R(ctx, px, 8, 20, 24, PAL.panel);
-    drawLogo(ctx, px + 4, 11);
+    drawMark(ctx, px + 5, 10);
     R(ctx, px + 3, 25, 14, 1, PAL.teal);
     R(ctx, px + 5, 28, 10, 1, PAL.secondary);
 
@@ -278,13 +293,13 @@ export class Scene {
     const mx = LW - mw - 8;
     if (mx > px + 26) {
       R(ctx, mx - 2, 7, mw + 4, 24, PAL.ink);
-      R(ctx, mx, 9, mw, 20, '#081016');
+      R(ctx, mx, 9, mw, 20, PAL.screen);
       let text;
       let color = PAL.tealDark;
       if (this.room.timerEnd && !this.room.revealed) {
         const left = Math.max(0, Math.ceil((this.room.timerEnd - Date.now()) / 1000));
         text = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
-        color = left <= 10 ? (Math.floor(t / 250) % 2 ? PAL.red : '#7a2a14') : PAL.teal;
+        color = left <= 10 ? (Math.floor(t / 250) % 2 ? PAL.red : shade(PAL.red, -0.35)) : PAL.teal;
       } else {
         const d = new Date();
         text = `${String(d.getHours()).padStart(2, '0')}${Math.floor(t / 1000) % 2 ? ':' : ' '}${String(d.getMinutes()).padStart(2, '0')}`;
@@ -297,13 +312,13 @@ export class Scene {
     // plant
     if (LW > 230) {
       const plx = mx > px + 26 ? mx - 18 : LW - 16;
-      R(ctx, plx, WH - 10, 9, 7, '#8a5532');
-      R(ctx, plx - 1, WH - 11, 11, 2, '#a86a3d');
+      R(ctx, plx, WH - 10, 9, 7, PAL.plantPot);
+      R(ctx, plx - 1, WH - 11, 11, 2, shade(PAL.plantPot, 0.08));
       const sway = Math.floor(t / 900) % 2;
-      R(ctx, plx + 3, WH - 20, 2, 9, '#1f8a52');
-      R(ctx, plx - 1 + sway, WH - 18, 4, 3, PAL.green);
-      R(ctx, plx + 5 - sway, WH - 22, 4, 3, PAL.green);
-      R(ctx, plx + 1, WH - 25, 4, 4, '#2bd36c');
+      R(ctx, plx + 3, WH - 20, 2, 9, PAL.leafDark);
+      R(ctx, plx - 1 + sway, WH - 18, 4, 3, PAL.leaf);
+      R(ctx, plx + 5 - sway, WH - 22, 4, 3, PAL.leaf);
+      R(ctx, plx + 1, WH - 25, 4, 4, shade(PAL.leaf, 0.08));
     }
   }
 

@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="64" height="64" shape-rendering="crispEdges">
+  <!-- Pixel Poker mark: a playing card with a diamond -->
+  <rect x="4" y="1" width="8" height="14" fill="#241e3d"/>
+  <rect x="3" y="2" width="10" height="12" fill="#241e3d"/>
+  <rect x="4" y="2" width="8" height="12" fill="#fff8ee"/>
+  <rect x="5" y="3" width="1" height="1" fill="#ff5d73"/>
+  <rect x="10" y="12" width="1" height="1" fill="#ff5d73"/>
+  <rect x="7" y="5" width="2" height="1" fill="#ffc93c"/>
+  <rect x="6" y="6" width="4" height="1" fill="#ffc93c"/>
+  <rect x="5" y="7" width="6" height="2" fill="#ffc93c"/>
+  <rect x="6" y="9" width="4" height="1" fill="#ffc93c"/>
+  <rect x="7" y="10" width="2" height="1" fill="#ffc93c"/>
+  <rect x="5" y="7" width="1" height="2" fill="#e6ae1f"/>
+  <rect x="7" y="10" width="1" height="1" fill="#e6ae1f"/>
+</svg>

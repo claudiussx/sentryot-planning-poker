@@ -63,6 +63,6 @@ test('nearest deck value rounds ties up', () => {
 });
 
 test('labels', () => {
-  assert.equal(label('0.5'), '1/2');
+  assert.equal(label('0.5'), '0.5');
   assert.equal(label('13'), '13');
 });

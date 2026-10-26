@@ -1,35 +1,85 @@
 // Procedural pixel-art characters. Every shape is a handful of fillRects on a
 // low-resolution canvas that CSS scales up with `image-rendering: pixelated`.
 
-export const PAL = {
-  ink: '#0e1113',
-  wall: '#19202a',
-  wallDark: '#151a21',
-  panel: '#1b2531',
-  sub: '#222e3b',
-  border: '#2c3a4b',
-  borderLight: '#43556f',
-  muted: '#586d89',
-  secondary: '#7a8ca5',
-  value: '#bdc5d0',
+// Two palettes for the room: a night-time arcade and a sunny day. PAL is
+// mutated in place by setSceneTheme, so every draw call picks up the switch.
+const DARK = {
+  ink: '#0d0b1a',
+  wall: '#231e42',
+  wallDark: '#17142c',
+  panel: '#262049',
+  sub: '#2b2552',
+  border: '#3d3566',
+  borderLight: '#5a4f8c',
+  floorLine: '#221d3d',
+  muted: '#7a72a8',
+  secondary: '#a49cd0',
+  value: '#d9d3f2',
   white: '#ffffff',
-  paper: '#eef2f6',
-  paperShade: '#9fb0c2',
-  paperBack: '#c9d3de',
-  teal: '#00d0bf',
-  tealDark: '#00a090',
-  cyan: '#04d8dd',
-  red: '#ff552a',
-  green: '#22c55e',
-  gold: '#f2c94c',
-  goldDark: '#b88a1e',
-  pencil: '#f2b134',
+  paper: '#f7f3ff',
+  paperShade: '#a8a0c8',
+  paperBack: '#cfc6e8',
+  teal: '#4de0c0',
+  tealDark: '#2bb597',
+  cyan: '#7fe9ff',
+  red: '#ff5d73',
+  green: '#5ee27a',
+  gold: '#ffc93c',
+  goldDark: '#c9921a',
+  pencil: '#ffb347',
   pink: '#ff8fb1',
+  sky: '#0f0c24',
+  skyline: '#1d1838',
+  moon: '#fff2c4',
+  screen: '#0b0918',
+  plantPot: '#9a5b3a',
+  leaf: '#5ee27a',
+  leafDark: '#2b9a52',
 };
 
+const LIGHT = {
+  ...DARK,
+  ink: '#241e3d',
+  wall: '#f1e4cc',
+  wallDark: '#dcc6a1',
+  panel: '#fffaf0',
+  sub: '#8f6544',
+  border: '#a77b52',
+  borderLight: '#c99a6b',
+  floorLine: '#c9ae84',
+  muted: '#9a91b8',
+  secondary: '#6a6190',
+  value: '#3d3560',
+  paper: '#ffffff',
+  paperShade: '#c9bedf',
+  paperBack: '#e3dcef',
+  teal: '#12a88a',
+  tealDark: '#0d8a71',
+  cyan: '#2bb5d9',
+  red: '#e8445e',
+  green: '#2fae55',
+  gold: '#f2b417',
+  goldDark: '#b8860b',
+  sky: '#9fd8ff',
+  skyline: '#7fb2d6',
+  moon: '#ffd34d',
+  screen: '#1d1830',
+  plantPot: '#b06a43',
+  leaf: '#3fbf5f',
+  leafDark: '#2b8a45',
+};
+
+export const PAL = { ...DARK };
+export const SCENE = { light: false };
+
+export function setSceneTheme(light) {
+  Object.assign(PAL, light ? LIGHT : DARK);
+  SCENE.light = light;
+}
+
 export const SKINS = ['#f6d3b3', '#eabf98', '#d39b6d', '#b0784c', '#8a5532', '#5e3a22'];
-export const HAIR_COLORS = ['#2b1d14', '#4a2f1d', '#7b4a26', '#c8913a', '#e8d07a', '#a33b2a', '#d8d8d8', '#3b3f58', '#00d0bf', '#ff7ab8'];
-export const SHIRTS = ['#00d0bf', '#04d8dd', '#ff552a', '#7a5cff', '#22c55e', '#f2b134', '#e14d7a', '#4b8bff', '#bdc5d0', '#2c3a4b'];
+export const HAIR_COLORS = ['#2b1d14', '#4a2f1d', '#7b4a26', '#c8913a', '#e8d07a', '#a33b2a', '#d8d8d8', '#3b3f58', '#4de0c0', '#ff7ab8'];
+export const SHIRTS = ['#4de0c0', '#7fe9ff', '#ff5d73', '#8b6cff', '#5ee27a', '#ffc93c', '#ff7ab8', '#4b8bff', '#d9d3f2', '#3d3566'];
 export const HAIR_STYLES = ['short', 'long', 'bun', 'spiky', 'bald', 'cap', 'curly', 'mohawk', 'ponytail'];
 export const ACCESSORIES = ['none', 'none', 'glasses', 'sunglasses', 'headphones', 'beard', 'mustache'];
 
@@ -58,7 +108,7 @@ export function seedOf(s) {
 export function randomLook(seed = Math.random() * 1e9) {
   const r = rng(Math.floor(seed));
   const pick = (n) => Math.floor(r() * n);
-  // teal and pink hair are rare treats
+  // mint and pink hair are rare treats
   let hairColor = pick(HAIR_COLORS.length);
   if (hairColor >= 8 && r() < 0.6) hairColor = pick(8);
   return {
@@ -155,30 +205,72 @@ const ICONS = {
   fire: ['...#...', '..##...', '.###.#.', '.#####.', '###.###', '##...##', '.#####.'],
   // a teal mug sized for the vote sign
   mug: ['...s..s.....', '..s..s......', '...s..s.....', '............', '.tttttttt...', '.tbbbbbbtt..', '.tttttttt.t.', '.tttttttt.t.', '.ttttttttt..', '..tttttt....'],
+  laugh: ['#.#.##.', '#.#.#.#', '.#..#.#', '#.#.#.#', '#.#.##.'],
+  party: ['r.....p', '..c..r.', '.y..c..', '.yy....', '.yyy.p.', 'yyyy...', 'yyyy.c.'],
+  star: ['...#...', '..###..', '#######', '.#####.', '..###..', '.##.##.', '.#...#.'],
+  idea: ['..###..', '.#####.', '.#####.', '.#####.', '..###..', '..sss..', '...s...'],
+  rocket: ['...#...', '..###..', '..#c#..', '..###..', '.#####.', '.#.o.#.', '...o...'],
+  clock: ['.kkkkk.', 'k..k..k', 'k..k..k', 'k..kk.k', 'k.....k', 'k.....k', '.kkkkk.'],
+  angry: ['.#####.', '#k###k#', '##k#k##', '#######', '##kkk##', '#k###k#', '.#####.'],
+  skull: ['.#####.', '#######', '#..#..#', '#..#..#', '###.###', '.#####.', '.#.#.#.'],
+  ghost: ['..###..', '.#####.', '#k##k##', '#######', '#######', '#######', '#.#.#.#'],
   check: ['......#', '.....##', '#...##.', '##.##..', '.###...', '..#....'],
   eye: ['.......', '..###..', '.#...#.', '#..#..#', '.#...#.', '..###..', '.......'],
 };
 
+// A PAL key follows the theme; a hex value stays put.
 const ICON_COLORS = {
-  heart: PAL.red,
-  bang: PAL.red,
-  question: PAL.teal,
+  heart: 'red',
+  bang: 'red',
+  question: 'teal',
   smile: '#e6a817',
   coffee: '#8a5532',
-  zzz: PAL.secondary,
-  thumb: PAL.teal,
-  fire: PAL.red,
-  check: PAL.white,
-  eye: PAL.teal,
+  zzz: 'secondary',
+  thumb: 'teal',
+  fire: 'red',
+  check: 'white',
+  eye: 'teal',
+  laugh: '#e09b1a',
+  star: 'gold',
+  idea: 'gold',
+  rocket: 'red',
+  angry: 'red',
+  skull: 'secondary',
+  ghost: '#b9a8ff',
 };
 
-export const EMOTES = ['thumb', 'heart', 'smile', 'fire', 'bang', 'question', 'coffee', 'zzz'];
+const iconColor = (name) => {
+  const c = ICON_COLORS[name] || 'value';
+  return c.startsWith('#') ? c : PAL[c];
+};
+
+export const EMOTES = ['thumb', 'heart', 'smile', 'laugh', 'fire', 'party', 'star', 'idea', 'rocket', 'clock', 'bang', 'question', 'angry', 'skull', 'ghost', 'coffee', 'zzz'];
+
+export const EMOTE_NAMES = {
+  thumb: 'Thumbs up',
+  heart: 'Love it',
+  smile: 'Happy',
+  laugh: 'LOL',
+  fire: 'On fire',
+  party: 'Party',
+  star: 'Star',
+  idea: 'Idea',
+  rocket: 'Ship it',
+  clock: 'Hurry up',
+  bang: 'Wow',
+  question: 'Huh?',
+  angry: 'Grr',
+  skull: 'Dead',
+  ghost: 'Boo',
+  coffee: 'Coffee',
+  zzz: 'Sleepy',
+};
 
 export function drawIcon(ctx, name, x, y, s = 1, color) {
   const rows = ICONS[name];
   if (!rows) return;
   // '#' is the icon colour; the other letters are fixed accents
-  const inks = { '#': color || ICON_COLORS[name], s: PAL.secondary, l: '#c08a5a', t: PAL.tealDark, b: '#6b3f22' };
+  const inks = { '#': color || iconColor(name), s: PAL.secondary, l: '#c08a5a', t: PAL.tealDark, b: '#6b3f22', y: PAL.gold, o: '#ff8a3d', k: PAL.ink, r: PAL.red, p: PAL.pink, c: PAL.cyan };
   rows.forEach((row, yy) => {
     for (let xx = 0; xx < row.length; xx++) {
       const ink = inks[row[xx]];
@@ -189,26 +281,28 @@ export function drawIcon(ctx, name, x, y, s = 1, color) {
   });
 }
 
-// The SentryOT mark: teal rounded square with a white S (12x11).
-const LOGO = [
-  ' TTTTTTTTTT ',
-  'TTTTTTTTTTTT',
-  'TTTWWWWWWTTT',
-  'TTWWTTTTTTTT',
-  'TTWWTTTTTTTT',
-  'TTTWWWWWTTTT',
-  'TTTTTTTTWWTT',
-  'TTTTTTTTWWTT',
-  'TTWWWWWWWTTT',
-  'TTTTTTTTTTTT',
-  ' TTTTTTTTTT ',
+// The Pixel Poker mark: a playing card with a diamond (9x12).
+const MARK = [
+  ' KKKKKKK ',
+  'KWWWWWWWK',
+  'KWRWWWWWK',
+  'KWWWYWWWK',
+  'KWWYYYWWK',
+  'KWYYYYYWK',
+  'KWWYYYWWK',
+  'KWWWYWWWK',
+  'KWWWWWWWK',
+  'KWWWWWRWK',
+  'KWWWWWWWK',
+  ' KKKKKKK ',
 ];
 
-export function drawLogo(ctx, x, y, s = 1) {
-  LOGO.forEach((row, yy) => {
+export function drawMark(ctx, x, y, s = 1) {
+  const inks = { K: PAL.ink, W: PAL.paper, R: PAL.red, Y: PAL.gold };
+  MARK.forEach((row, yy) => {
     for (let xx = 0; xx < row.length; xx++) {
       if (row[xx] === ' ') continue;
-      ctx.fillStyle = row[xx] === 'T' ? PAL.teal : PAL.white;
+      ctx.fillStyle = inks[row[xx]];
       ctx.fillRect(x + xx * s, y + yy * s, s, s);
     }
   });
@@ -442,7 +536,7 @@ function drawSign(ctx, cx, sy, value) {
     drawIcon(ctx, 'mug', cx - 6, sy + 3);
     return;
   }
-  const text = value == null ? '-' : value === '0.5' ? '1/2' : value;
+  const text = value == null ? '-' : value;
   const s = textWidth(text, 2) <= w - 6 ? 2 : 1;
   const tw = textWidth(text, s);
   drawText(ctx, text, cx - Math.floor(tw / 2), sy + Math.floor((h - 5 * s) / 2) - (s === 2 ? 1 : 0), value === '?' ? PAL.tealDark : PAL.ink, s);
@@ -460,7 +554,7 @@ function drawBody(ctx, cx, dy, hy, look) {
   R(ctx, cx - 1, ty, 2, 2, shade(skin, -0.05));
   R(ctx, cx - 7, ty + 3, 1, dy - ty - 3, shade(shirt, -0.15));
   R(ctx, cx + 6, ty + 3, 1, dy - ty - 3, shade(shirt, -0.15));
-  // little SentryOT patch on teal tops
+  // a little badge on the mint and sky tops
   if (look.shirt <= 1) R(ctx, cx + 2, ty + 3, 2, 2, PAL.white);
   // head
   R(ctx, cx - 4, hy, 8, 10, skin);

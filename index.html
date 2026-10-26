@@ -3,29 +3,28 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>SentryOT Planning Poker</title>
-    <meta name="description" content="Pixel-art planning poker for the SentryOT team. Share a link, pick a card, raise your paper." />
-    <meta name="theme-color" content="#151a21" />
-    <link rel="icon" type="image/svg+xml" href="assets/favicon.svg" />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;500;600;700&family=Press+Start+2P&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="css/style.css?v=7" />
-    <script>
-      // apply the saved font before first paint so the page does not flash
-      try {
-        if (localStorage.getItem('sop.font') === 'normal') document.documentElement.dataset.font = 'normal';
-      } catch {}
-    </script>
+    <title>Pixel Poker</title>
+    <meta name="description" content="Pixel-art planning poker. Share a link, pick a card, raise your paper." />
+    <meta name="theme-color" content="#16132a" />
+    <meta name="referrer" content="no-referrer" />
+    <!-- CSP_START: npm run bump rewrites the importmap hash -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'sha256-P7C97GLUYxg9aeKm+81NGiMYwffa6/12ZSGg40C7m70='; style-src 'self'; font-src 'self'; img-src 'self' data:; connect-src wss://broker.hivemq.com:8884 wss://broker.emqx.io:8084 wss://test.mosquitto.org:8081; worker-src blob:; base-uri 'none'; form-action 'none'" />
+    <!-- CSP_END -->
+    <link rel="icon" type="image/svg+xml" href="assets/mark.svg" />
+    <link rel="stylesheet" href="css/style.css?v=8" />
+    <script src="js/boot.js?v=8"></script>
   </head>
   <body>
     <!-- ============ LOBBY ============ -->
     <section id="lobby" class="screen">
       <div class="lobby-card pixel-box">
-        <button type="button" class="btn btn-small font-toggle lobby-font-toggle" aria-label="Switch font style"></button>
+        <div class="lobby-toggles">
+          <button type="button" class="btn btn-small theme-toggle" aria-label="Switch theme"></button>
+          <button type="button" class="btn btn-small font-toggle" aria-label="Switch font style"></button>
+        </div>
         <header class="lobby-brand">
-          <img src="assets/logo-h.svg" alt="SentryOT" class="lobby-logo" />
-          <h1>Planning Poker</h1>
+          <img src="assets/mark.svg" alt="" class="lobby-logo" width="64" height="64" />
+          <h1>Pixel Poker</h1>
           <p class="tagline">Grab a chair. Pick a card. Raise your paper.</p>
         </header>
 
@@ -58,22 +57,23 @@
           </form>
         </div>
       </div>
-      <p class="footnote">Votes travel end-to-end encrypted through public relays. Anyone who knows a room name can join it; a private room's key lives only in its link.</p>
+      <p class="footnote">Rooms talk through free public relays, encrypted. A private room's key lives only in its link; anyone who knows or guesses a room name can join that room.</p>
     </section>
 
     <!-- ============ ROOM ============ -->
     <section id="room" class="screen" hidden>
       <header class="topbar">
         <div class="topbar-brand">
-          <img src="assets/symbol.svg" alt="SentryOT" width="34" height="33" />
+          <img src="assets/mark.svg" alt="" width="32" height="32" class="topbar-mark" />
           <div>
-            <div class="topbar-kicker">SentryOT Planning Poker</div>
+            <div class="topbar-kicker">Pixel Poker</div>
             <div class="topbar-title" id="room-title">Room</div>
           </div>
         </div>
         <div class="topbar-actions">
           <span id="conn" class="conn" title="Connection"></span>
           <button type="button" class="btn" id="role-toggle"></button>
+          <button type="button" class="btn theme-toggle" aria-label="Switch theme"></button>
           <button type="button" class="btn font-toggle" aria-label="Switch font style"></button>
           <button type="button" class="btn btn-primary" id="invite">Copy invite link</button>
           <button type="button" class="btn btn-icon" id="mute" aria-label="Toggle sound"></button>
@@ -87,6 +87,7 @@
             <div class="story">
               <span class="round-chip">Round <b id="round-no">1</b></span>
               <span id="story-text" class="story-text"></span>
+              <input id="story-input" class="story-input" maxlength="120" placeholder="Type the story or ticket we are sizing" aria-label="Story" hidden />
             </div>
             <div class="story-right">
               <div class="status-line" id="status-line"></div>
@@ -108,7 +109,6 @@
 
           <div id="host-bar" class="host-bar pixel-box" hidden>
             <div class="host-tag">You are the host</div>
-            <input id="story-input" class="story-input" maxlength="120" placeholder="Story or ticket, e.g. 23096: import dialog" aria-label="Story" />
             <div class="timer-group" role="group" aria-label="Timer">
               <span class="timer-label">Timer</span>
               <button type="button" class="btn btn-small" data-timer="30">30s</button>
@@ -133,10 +133,11 @@
           </section>
           <section class="pixel-box panel">
             <div class="panel-head">
-              <h2>History</h2>
-              <button type="button" class="btn btn-small" id="copy-history">Copy</button>
+              <h2>Estimates</h2>
+              <span id="estimates-total" class="estimates-total"></span>
+              <button type="button" class="btn btn-small" id="copy-estimates">Copy</button>
             </div>
-            <ol id="history" class="history"></ol>
+            <ol id="estimates" class="estimates"></ol>
           </section>
         </aside>
       </main>
@@ -149,17 +150,17 @@
     <script type="importmap">
       {
         "imports": {
-          "./js/main.js": "./js/main.js?v=7",
-          "./js/net.js": "./js/net.js?v=7",
-          "./js/scene.js": "./js/scene.js?v=7",
-          "./js/sprites.js": "./js/sprites.js?v=7",
-          "./js/stats.js": "./js/stats.js?v=7",
-          "./js/audio.js": "./js/audio.js?v=7",
-          "./js/room-name.js": "./js/room-name.js?v=7",
-          "./vendor/mqtt.esm.js": "./vendor/mqtt.esm.js?v=7"
+          "./js/main.js": "./js/main.js?v=8",
+          "./js/net.js": "./js/net.js?v=8",
+          "./js/scene.js": "./js/scene.js?v=8",
+          "./js/sprites.js": "./js/sprites.js?v=8",
+          "./js/stats.js": "./js/stats.js?v=8",
+          "./js/audio.js": "./js/audio.js?v=8",
+          "./js/room-name.js": "./js/room-name.js?v=8",
+          "./vendor/mqtt.esm.js": "./vendor/mqtt.esm.js?v=8"
         }
       }
     </script>
-    <script type="module" src="js/main.js?v=7"></script>
+    <script type="module" src="js/main.js?v=8"></script>
   </body>
 </html>

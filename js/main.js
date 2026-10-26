@@ -1,7 +1,7 @@
 import { RoomClient, newToken, newId } from './net.js';
 import { Scene } from './scene.js';
-import { randomLook, sanitizeLook, drawPreview, drawIconCentered, EMOTES, SHIRTS, HAIR_STYLES, HAIR_COLORS, SKINS, ACCESSORIES } from './sprites.js';
-import { DECK, computeStats, label } from './stats.js';
+import { randomLook, sanitizeLook, drawPreview, drawIconCentered, setSceneTheme, EMOTES, EMOTE_NAMES, SHIRTS, HAIR_STYLES, HAIR_COLORS, SKINS, ACCESSORIES } from './sprites.js';
+import { DECK, computeStats, label, isNumeric } from './stats.js';
 import { play, isMuted, setMuted } from './audio.js';
 import { roomSlug, parseRoomHash } from './room-name.js';
 
@@ -11,6 +11,10 @@ const OFFLINE_MAX_MS = 20 * 60_000; // asleep this long without coming back: the
 const HEARTBEAT_MS = 20_000;
 const HOST_GRACE_MS = 5_000; // let a refreshing host come back before someone else takes over
 const MAX_HISTORY = 30;
+const MAX_PEERS = 40; // more seats than any team has: beyond this it is someone flooding the room
+const EVENT_BURST = 8; // events one person may send in EVENT_WINDOW_MS before the rest are dropped
+const EVENT_WINDOW_MS = 4_000;
+const MAX_SEQ_JUMP = 1_000; // room updates come one at a time; a huge jump is a forged state
 
 // ---------- storage (never trusted to exist) ----------
 
@@ -31,6 +35,12 @@ const store = {
     }
   },
 };
+
+// Storage keys never contain the room secret: the github.io origin is shared with other pages.
+async function storeKeyFor(token) {
+  const d = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`store:${token}`)));
+  return [...d.slice(0, 8)].map((b) => b.toString(16).padStart(2, '0')).join('');
+}
 
 // ---------- identity ----------
 
@@ -73,6 +83,8 @@ const state = {
   scene: null,
   lastThrow: 0,
   recentlyGone: new Map(),
+  eventLog: new Map(), // sender id -> recent event times, for the flood limit
+  skey: null, // storage key for this room
 };
 
 function parseHash() {
@@ -190,6 +202,7 @@ async function onEnter(e) {
     const slug = invite ? invite.slug : roomSlug(typed);
     state.token = invite ? invite.token : slug ? `room:${slug}` : newToken();
     state.roomLabel = typed || slug || 'Planning room';
+    state.skey = await storeKeyFor(state.token);
     const rc = new RoomClient({ token: state.token, myId: state.me.id });
     await rc.init();
     await rc.connect();
@@ -198,7 +211,7 @@ async function onEnter(e) {
     const creating = !invite && !slug;
     await enterRoom(rc, creating ? { creating: true, roomName: typed || 'Planning room' } : { creating: false });
   } catch (ex) {
-    console.error('Failed to connect to the planning room', { token: state.token, error: ex });
+    console.error('Failed to connect to the planning room', { error: ex });
     err.textContent = 'Could not reach the relay. Check your connection and try again.';
     err.hidden = false;
   } finally {
@@ -218,11 +231,11 @@ async function enterRoom(rc, { creating, roomName }) {
   state.room = null;
   state.ready = false;
 
-  const joinedKey = `sop.joined.${state.token}`;
+  const joinedKey = `sop.joined.${state.skey}`;
   state.me.joinedAt = store.get('sessionStorage', joinedKey) || Date.now();
   store.set('sessionStorage', joinedKey, state.me.joinedAt);
 
-  const saved = store.get('sessionStorage', `sop.vote.${state.token}`);
+  const saved = store.get('sessionStorage', `sop.vote.${state.skey}`);
   if (saved) {
     state.myVote = saved.vote;
     state.myRound = saved.round;
@@ -240,7 +253,7 @@ async function enterRoom(rc, { creating, roomName }) {
   }
 
   rc.addEventListener('presence', (e) => onPresence(e.detail));
-  rc.addEventListener('presence-gone', (e) => onPresenceGone(e.detail.id));
+  rc.addEventListener('presence-gone', (e) => onPresenceGone(e.detail.id, e.detail.left));
   rc.addEventListener('room', (e) => onRoom(e.detail));
   rc.addEventListener('event', (e) => onEvent(e.detail));
   rc.addEventListener('status', (e) => {
@@ -255,7 +268,7 @@ async function enterRoom(rc, { creating, roomName }) {
   $('#conn').className = 'conn online';
 
   if (creating) {
-    state.room = { v: 1, seq: 1, name: roomName, hostId: state.me.id, round: 1, revealed: false, topic: '', timerEnd: null, autoReveal: false, history: [], createdAt: Date.now() };
+    state.room = { v: 1, seq: 1, name: roomName, hostId: state.me.id, round: 1, revealed: false, topic: '', final: null, timerEnd: null, autoReveal: false, history: [], createdAt: Date.now() };
     rc.publishRoom(state.room);
     state.ready = true;
   } else {
@@ -263,6 +276,7 @@ async function enterRoom(rc, { creating, roomName }) {
     setTimeout(() => {
       state.ready = true;
       checkHost();
+      resolveNameClash();
       render();
     }, 1800);
   }
@@ -274,11 +288,12 @@ async function enterRoom(rc, { creating, roomName }) {
   state.heartbeat?.stop();
   state.heartbeat = everyMs(HEARTBEAT_MS, () => {
     publishPresence();
+    // anyone can wipe a retained message on a public relay; the host keeps putting the room back
+    if (amHost() && state.room) state.rc.publishRoom(state.room);
     prunePeers();
   });
   state.ticker?.stop();
   state.ticker = everyMs(1000, tickSecond);
-  rc.prepareGoodbye({ type: 'bye', from: state.me.id });
 }
 
 // Background tabs get their timers throttled to once a minute; a worker's timers keep their pace.
@@ -333,7 +348,7 @@ function checkHost() {
   if (!state.room) {
     // empty room with no state at all (relay forgot it): start fresh
     if (effectiveHostId(list) === state.me.id) {
-      updateRoom({ v: 1, name: state.roomLabel || 'Planning room', hostId: state.me.id, round: 1, revealed: false, topic: '', timerEnd: null, autoReveal: false, history: [], createdAt: Date.now() });
+      updateRoom({ v: 1, name: state.roomLabel || 'Planning room', hostId: state.me.id, round: 1, revealed: false, topic: '', final: null, timerEnd: null, autoReveal: false, history: [], createdAt: Date.now() });
     }
     return;
   }
@@ -362,7 +377,7 @@ function publishPresence(only) {
   const room = state.room;
   const myRoundActive = room && state.myRound === room.round;
   state.rc.publishPresence({
-    v: 2, // v2+ says goodbye explicitly; older tabs only clear their seat
+    v: 3,
     id: state.me.id,
     name: state.me.name,
     look: state.me.look,
@@ -401,12 +416,14 @@ function onPresence(raw) {
   if (!p || p.id === state.me.id) return;
   if (Date.now() - p.ts > OFFLINE_MAX_MS) return;
   const known = state.peers.has(p.id);
+  if (!known && state.peers.size >= MAX_PEERS) return;
   const prev = state.peers.get(p.id);
   // someone back from another browser or device takes over their own sleeping seat
   for (const [id, q] of state.peers) {
     if (id !== p.id && q.offline && q.name.toLowerCase() === p.name.toLowerCase()) removePeer(id, { quiet: true });
   }
   state.peers.set(p.id, { ...p, seenAt: Date.now() });
+  resolveNameClash();
   const back = state.recentlyGone.get(p.id);
   state.recentlyGone.delete(p.id);
   // a reload looks like leave + join; keep that quiet
@@ -423,11 +440,28 @@ function onPresence(raw) {
 // The relays dropped this person's connection. That also happens to a tab the
 // browser froze in the background, so keep the seat (asleep) until they come
 // back, say goodbye, or stay away too long.
-function onPresenceGone(id) {
+// Two awake seats with one name confuse everyone: whoever sat down later becomes "Name 2".
+function resolveNameClash() {
+  if (!state.ready) return;
+  const mine = state.me.name.toLowerCase();
+  const earlier = (p) => p.joinedAt < state.me.joinedAt || (p.joinedAt === state.me.joinedAt && p.id < state.me.id);
+  const clash = [...state.peers.values()].some((p) => !p.offline && p.name.toLowerCase() === mine && earlier(p));
+  if (!clash) return;
+  const taken = new Set([...state.peers.values()].map((p) => p.name.toLowerCase()));
+  const base = state.me.name.replace(/ \d+$/, '') || state.me.name;
+  let next = base;
+  for (let n = 2; taken.has(next.toLowerCase()) || next.toLowerCase() === mine; n++) next = `${base.slice(0, 19 - String(n).length)} ${n}`;
+  state.me.name = next;
+  store.set('sessionStorage', 'sop.name', next);
+  toast(`Someone here is already called ${base}. You are ${next} for now.`);
+  publishPresence();
+}
+
+function onPresenceGone(id, left) {
   const p = state.peers.get(id);
-  if (!p || p.offline) return;
-  // a tab from before the goodbye message only ever clears its seat: take that as leaving
-  if (p.v < 2) return removePeer(id);
+  if (!p) return;
+  if (left) return removePeer(id);
+  if (p.offline) return;
   p.offline = true;
   p.offlineSince = Date.now();
   render();
@@ -461,20 +495,43 @@ function prunePeers() {
   if (changed) render();
 }
 
+const smallInt = (v, max) => Number.isInteger(v) && v >= 0 && v <= max;
+const str = (v, max) => (typeof v === 'string' ? v.slice(0, max) : '');
+
+// Room state comes from whoever holds the key: keep only known fields, in known shapes and sizes.
+function sanitizeEstimate(h) {
+  if (!h || typeof h !== 'object') return null;
+  const votes = Array.isArray(h.votes)
+    ? h.votes
+        .slice(0, MAX_PEERS)
+        .filter((v) => Array.isArray(v) && typeof v[0] === 'string' && DECK.includes(v[1]))
+        .map(([n, v]) => [n.slice(0, 20), v])
+    : [];
+  return {
+    round: smallInt(h.round, 1e6) ? h.round : 0,
+    topic: str(h.topic, 120),
+    final: DECK.includes(h.final) ? h.final : null,
+    average: Number.isFinite(h.average) ? h.average : null,
+    votes,
+    at: Number.isFinite(h.at) ? h.at : 0,
+  };
+}
+
 function sanitizeRoom(d) {
-  if (!d || typeof d.hostId !== 'string' || !Number.isInteger(d.round)) return null;
+  if (!d || typeof d.hostId !== 'string' || !smallInt(d.round, 1e6) || !smallInt(d.seq, 1e9)) return null;
   return {
     v: 1,
-    name: typeof d.name === 'string' ? d.name.slice(0, 40) : 'Planning room',
-    hostId: d.hostId,
+    name: str(d.name, 40) || 'Planning room',
+    hostId: d.hostId.slice(0, 16),
     round: d.round,
     revealed: !!d.revealed,
-    topic: typeof d.topic === 'string' ? d.topic.slice(0, 120) : '',
+    topic: str(d.topic, 120),
+    final: DECK.includes(d.final) ? d.final : null,
     timerEnd: Number.isFinite(d.timerEnd) ? d.timerEnd : null,
     autoReveal: !!d.autoReveal,
-    history: Array.isArray(d.history) ? d.history.slice(-MAX_HISTORY).filter((h) => h && typeof h === 'object') : [],
-    createdAt: d.createdAt,
-    seq: Number.isInteger(d.seq) ? d.seq : 0,
+    history: Array.isArray(d.history) ? d.history.slice(-MAX_HISTORY).map(sanitizeEstimate).filter(Boolean) : [],
+    createdAt: Number.isFinite(d.createdAt) ? d.createdAt : 0,
+    seq: d.seq,
   };
 }
 
@@ -482,8 +539,8 @@ function onRoom(raw) {
   const next = sanitizeRoom(raw);
   if (!next) return;
   const prev = state.room;
-  // ignore anything older than what we already hold (our own echo included)
-  if (prev && next.seq < prev.seq) return;
+  // ignore anything older than what we already hold (our own echo included), or implausibly far ahead
+  if (prev && (next.seq < prev.seq || next.seq > prev.seq + MAX_SEQ_JUMP)) return;
   // two people opening an empty named room at once both set it up: everyone keeps the same one
   if (prev && next.seq === prev.seq && next.hostId !== prev.hostId && next.hostId > prev.hostId) return;
   state.room = next;
@@ -506,7 +563,11 @@ function onRoom(raw) {
 
 function onEvent(e) {
   if (!e || typeof e.from !== 'string' || e.from === state.me.id || !state.peers.has(e.from)) return;
-  if (e.type === 'bye') return removePeer(e.from);
+  // one person spamming throws or emotes should not drown the room
+  const now = Date.now();
+  const recent = (state.eventLog.get(e.from) || []).filter((t) => now - t < EVENT_WINDOW_MS);
+  if (recent.length >= EVENT_BURST) return;
+  state.eventLog.set(e.from, [...recent, now]);
   if (e.type === 'kick') {
     // only the host clears a sleeping seat, and never ours: we are clearly here
     if (typeof e.id === 'string' && e.id !== state.me.id && e.from === state.room?.hostId) removePeer(e.id);
@@ -548,7 +609,7 @@ function maybeAutoReveal() {
 // ---------- actions ----------
 
 function saveVote() {
-  store.set('sessionStorage', `sop.vote.${state.token}`, { vote: state.myVote, round: state.myRound, pick: state.myPick });
+  store.set('sessionStorage', `sop.vote.${state.skey}`, { vote: state.myVote, round: state.myRound, pick: state.myPick });
 }
 
 function pickCard(value) {
@@ -582,23 +643,28 @@ function nextRound() {
   if (room.revealed) {
     const votes = allPlayers().filter((p) => p.vote != null);
     const s = computeStats(votes);
-    history.push({
-      round: room.round,
-      topic: room.topic,
-      average: s.average,
-      suggested: s.suggested,
-      consensus: s.consensus,
-      votes: votes.map((v) => [v.name, v.vote]),
-      at: Date.now(),
-    });
+    // the host's pick, or the suggestion if they did not choose
+    const final = room.final ?? (s.suggested != null ? String(s.suggested) : null);
+    history.push({ round: room.round, topic: room.topic, final, average: s.average, votes: votes.map((v) => [v.name, v.vote]), at: Date.now() });
   }
   state.myVote = null;
   state.myRound = room.round + 1;
   saveVote();
-  updateRoom({ ...room, round: room.round + 1, revealed: false, topic: '', timerEnd: null, history: history.slice(-MAX_HISTORY) });
+  updateRoom({ ...room, round: room.round + 1, revealed: false, topic: '', final: null, timerEnd: null, history: history.slice(-MAX_HISTORY) });
   $('#story-input').value = '';
   play('round');
   publishPresence();
+}
+
+function setFinal(value) {
+  if (!amHost() || !state.room.revealed) return;
+  updateRoom({ ...state.room, final: value });
+  play('pick');
+}
+
+function removeEstimate(at) {
+  if (!amHost()) return;
+  updateRoom({ ...state.room, history: state.room.history.filter((h) => h.at !== at) });
 }
 
 function setTimer(sec) {
@@ -651,8 +717,8 @@ function sendEmote(icon) {
 
 async function leaveRoom() {
   try {
-    sessionStorage.removeItem(`sop.joined.${state.token}`);
-    sessionStorage.removeItem(`sop.vote.${state.token}`);
+    sessionStorage.removeItem(`sop.joined.${state.skey}`);
+    sessionStorage.removeItem(`sop.vote.${state.skey}`);
   } catch {
     /* ignore */
   }
@@ -661,7 +727,7 @@ async function leaveRoom() {
   try {
     await state.rc?.leave();
   } catch (e) {
-    console.error('Failed to leave the room cleanly', { token: state.token, error: e });
+    console.error('Failed to leave the room cleanly', { error: e });
   }
   history.replaceState(null, '', location.pathname);
   location.reload();
@@ -676,12 +742,12 @@ async function copyText(text, okMsg) {
   }
 }
 
-function historyText() {
-  const lines = (state.room?.history || []).map((h) => {
-    const votes = (h.votes || []).map(([n, v]) => `${n} ${label(v)}`).join(', ');
-    return `Round ${h.round}${h.topic ? ` - ${h.topic}` : ''}: avg ${h.average ?? '-'}, suggested ${h.suggested ?? '-'}${h.consensus ? ' (consensus)' : ''} [${votes}]`;
-  });
-  return `${state.room?.name || 'Planning'} - ${new Date().toISOString().slice(0, 10)}\n${lines.join('\n') || 'No rounds yet'}`;
+// What the team agreed, ready to paste into the backlog tool.
+function estimatesText() {
+  const items = state.room?.history || [];
+  const lines = items.map((h) => `- ${h.topic || `Round ${h.round}`}: ${h.final ? label(h.final) : '-'}`);
+  const total = items.reduce((sum, h) => sum + (isNumeric(h.final) ? Number(h.final) : 0), 0);
+  return `${state.room?.name || 'Planning'} - ${new Date().toISOString().slice(0, 10)}\n${lines.join('\n') || 'Nothing estimated yet'}\nTotal: ${total} points`;
 }
 
 // ---------- wiring ----------
@@ -719,8 +785,8 @@ function buildEmotes() {
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'btn emote-btn';
-    b.setAttribute('aria-label', `React: ${icon}`);
-    b.title = icon;
+    b.setAttribute('aria-label', `React: ${EMOTE_NAMES[icon]}`);
+    b.title = EMOTE_NAMES[icon];
     const c = document.createElement('canvas');
     c.width = 8;
     c.height = 8;
@@ -737,7 +803,7 @@ function wireRoomControls() {
   $('#role-toggle').onclick = toggleRole;
   $('#reveal').onclick = reveal;
   $('#next').onclick = nextRound;
-  $('#copy-history').onclick = () => copyText(historyText(), 'Summary copied');
+  $('#copy-estimates').onclick = () => copyText(estimatesText(), 'Estimates copied');
   $('#mute').onclick = () => {
     setMuted(!isMuted());
     renderMute();
@@ -810,26 +876,56 @@ function wireFontToggle() {
   sync();
 }
 
+// Light or dark: the page and the pixel room both follow.
+function wireThemeToggle() {
+  const isLight = () => document.documentElement.dataset.theme === 'light';
+  const sync = () => {
+    setSceneTheme(isLight());
+    document.querySelectorAll('.theme-toggle').forEach((b) => {
+      b.textContent = isLight() ? 'Theme: Light' : 'Theme: Dark';
+      b.title = 'Switch between the light and the dark theme';
+    });
+    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', isLight() ? '#f6efe2' : '#16132a');
+    if (state.rc) renderMute();
+  };
+  document.querySelectorAll('.theme-toggle').forEach(
+    (b) =>
+      (b.onclick = () => {
+        document.documentElement.dataset.theme = isLight() ? 'dark' : 'light';
+        // raw string, not JSON: js/boot.js reads it before modules load
+        try {
+          localStorage.setItem('sop.theme', document.documentElement.dataset.theme);
+        } catch {
+          /* blocked storage: the switch still works for this visit */
+        }
+        sync();
+        play('pick');
+      }),
+  );
+  sync();
+}
+
 function renderMute() {
   const b = $('#mute');
+  const css = getComputedStyle(document.documentElement);
   b.innerHTML = '';
   const c = document.createElement('canvas');
   c.width = 9;
   c.height = 7;
   c.style.cssText = 'width:27px;height:21px;image-rendering:pixelated';
   const ctx = c.getContext('2d');
-  ctx.fillStyle = '#bdc5d0';
+  ctx.fillStyle = css.getPropertyValue('--value').trim();
   ctx.fillRect(0, 2, 2, 3);
   ctx.fillRect(2, 1, 1, 5);
   ctx.fillRect(3, 0, 1, 7);
   if (isMuted()) {
-    ctx.fillStyle = '#ff552a';
+    ctx.fillStyle = css.getPropertyValue('--red').trim();
     for (let i = 0; i < 4; i++) {
       ctx.fillRect(5 + i, 1.5 + i, 1, 1);
       ctx.fillRect(8 - i, 1.5 + i, 1, 1);
     }
   } else {
-    ctx.fillStyle = '#00d0bf';
+    ctx.fillStyle = css.getPropertyValue('--accent-2').trim();
     ctx.fillRect(5, 2, 1, 3);
     ctx.fillRect(7, 1, 1, 5);
   }
@@ -883,11 +979,14 @@ function render() {
   const host = amHost();
 
   $('#room-title').textContent = room?.name || 'Planning room';
-  document.title = `${room?.name || 'Planning'} · SentryOT Poker`;
+  document.title = `${room?.name || 'Planning'} · Pixel Poker`;
   $('#round-no').textContent = room?.round ?? '-';
+  // the host types the story right next to the round number; everyone else reads it there
   const story = $('#story-text');
-  story.textContent = room?.topic || (host ? 'Type the story below so everyone knows what we are sizing' : 'Waiting for the host to name the story');
+  story.hidden = host;
+  story.textContent = room?.topic || 'Waiting for the host to name the story';
   story.classList.toggle('is-empty', !room?.topic);
+  $('#story-input').hidden = !host;
   renderStatus();
 
   // host bar
@@ -927,7 +1026,7 @@ function render() {
 
   renderPlayers(players, host);
   renderResults(room, stats, allIn);
-  renderHistory(room);
+  renderEstimates(room, host);
 }
 
 function renderPlayers(players, host) {
@@ -986,7 +1085,8 @@ function el(tag, cls, text) {
 function renderResults(room, s, allIn) {
   const box = $('#results');
   const show = !!room?.revealed;
-  const key = show ? JSON.stringify([room.round, s]) : '';
+  const host = amHost();
+  const key = show ? JSON.stringify([room.round, s, room.final, host]) : '';
   if (box.dataset.key === key) return;
   box.dataset.key = key;
   box.hidden = !show;
@@ -1029,44 +1129,73 @@ function renderResults(room, s, allIn) {
   }
   box.append(dist);
 
+  // the number that goes on the ticket: the host picks it, the suggestion until they do
+  const final = room.final ?? (s.suggested != null ? String(s.suggested) : null);
+  const pick = el('div', 'final-pick');
+  pick.append(el('span', 'k', host ? 'Final estimate (pick one)' : 'Final estimate'));
+  if (host) {
+    const opts = el('div', 'final-opts');
+    for (const v of DECK.filter((d) => isNumeric(d))) {
+      const b = el('button', `final-opt${v === final ? ' is-on' : ''}`, label(v));
+      b.type = 'button';
+      b.setAttribute('aria-pressed', String(v === final));
+      b.onclick = () => setFinal(v);
+      opts.append(b);
+    }
+    pick.append(opts);
+  } else {
+    pick.append(el('span', 'final-value', final ? label(final) : '-'));
+  }
+  box.append(pick);
+
   if (s.consensus && allIn) box.append(el('div', 'res-note is-good', 'Consensus! Everyone agrees. Ship it.'));
   else if (s.spread) box.append(el('div', 'res-note is-warn', `Big spread: ${s.spread.low.name} (${label(s.spread.low.vote)}) and ${s.spread.high.name} (${label(s.spread.high.vote)}), tell us what you see.`));
   if (s.coffee) box.append(el('div', 'res-note', `${s.coffee} ${s.coffee === 1 ? 'person needs' : 'people need'} a coffee break.`));
   if (s.unsure) box.append(el('div', 'res-note', `${s.unsure} not sure. Maybe the story needs more detail.`));
 }
 
-function renderHistory(room) {
-  const ol = $('#history');
+// Each finished round leaves one line: the story and the points the team settled on.
+function renderEstimates(room, host) {
+  const ol = $('#estimates');
   const items = room?.history || [];
-  const key = JSON.stringify(items.map((h) => h.at));
+  const total = items.reduce((sum, h) => sum + (isNumeric(h.final) ? Number(h.final) : 0), 0);
+  $('#estimates-total').textContent = items.length ? `${total} pts` : '';
+  const key = JSON.stringify([items.map((h) => [h.at, h.final]), host]);
   if (ol.dataset.key === key) return;
   ol.dataset.key = key;
   ol.innerHTML = '';
   if (!items.length) {
-    ol.append(el('li', 'history-empty', 'Finished rounds show up here.'));
+    ol.append(el('li', 'estimates-empty', 'Stories you finish show up here with their final points, ready to copy into the backlog.'));
     return;
   }
   for (const h of [...items].reverse()) {
     const li = el('li');
-    li.append(el('span', 'h-story', h.topic || `Round ${h.round}`), el('span', 'h-avg', h.average != null ? `${h.average}` : '-'));
-    const votes = Array.isArray(h.votes) ? h.votes.length : 0;
-    li.append(el('span', 'h-meta', `Round ${h.round} · ${votes} votes · suggested ${h.suggested != null ? label(String(h.suggested)) : '-'}${h.consensus ? ' · consensus' : ''}`));
+    li.append(el('span', 'e-story', h.topic || `Round ${h.round}`), el('span', 'e-points', h.final ? label(h.final) : '-'));
+    if (host) {
+      const x = el('button', 'e-remove', 'x');
+      x.type = 'button';
+      x.title = 'Remove this line';
+      x.setAttribute('aria-label', `Remove ${h.topic || `round ${h.round}`}`);
+      x.onclick = () => removeEstimate(h.at);
+      li.append(x);
+    }
     ol.append(li);
   }
 }
 
 // ============================================================
 
-// handy from the devtools console when something looks off
-window.sopDebug = () => ({ rc: state.rc, me: state.me, room: state.room, peers: [...state.peers.values()], myVote: state.myVote, myRound: state.myRound, ready: state.ready });
+// for poking at a room from the console; only with ?debug in the address
+if (new URLSearchParams(location.search).has('debug')) window.sopDebug = () => ({ rc: state.rc, me: state.me, room: state.room, peers: [...state.peers.values()], myVote: state.myVote, myRound: state.myRound, ready: state.ready });
 
 (async function boot() {
   state.me.id = await resolveMyId();
   wireFontToggle();
+  wireThemeToggle();
   initLobby();
   // a reload of a tab that was already seated goes straight back to its chair
   const invite = parseHash();
-  if (invite && state.me.name && store.get('sessionStorage', `sop.joined.${invite.token}`)) $('#lobby-form').requestSubmit();
+  if (invite && state.me.name && store.get('sessionStorage', `sop.joined.${await storeKeyFor(invite.token)}`)) $('#lobby-form').requestSubmit();
   window.addEventListener('hashchange', () => {
     if (!state.rc) setLobbyMode(parseHash() ? 'join' : 'create');
   });

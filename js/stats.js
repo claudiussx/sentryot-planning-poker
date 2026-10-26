@@ -8,7 +8,6 @@ export function isNumeric(v) {
 }
 
 export function label(v) {
-  if (v === '0.5') return '1/2';
   if (v === 'coffee') return 'Coffee';
   return v;
 }
