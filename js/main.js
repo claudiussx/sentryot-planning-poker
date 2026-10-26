@@ -1178,7 +1178,7 @@ function renderResults(room, s, allIn) {
 // ============================================================
 
 // for poking at a room from the console; only with ?debug in the address
-if (new URLSearchParams(location.search).has('debug')) window.sopDebug = () => ({ rc: state.rc, me: state.me, room: state.room, peers: [...state.peers.values()], myVote: state.myVote, myRound: state.myRound, ready: state.ready });
+if (new URLSearchParams(location.search).has('debug')) window.sopDebug = () => ({ scene: state.scene, rc: state.rc, me: state.me, room: state.room, peers: [...state.peers.values()], myVote: state.myVote, myRound: state.myRound, ready: state.ready });
 
 (async function boot() {
   state.me.id = await resolveMyId();

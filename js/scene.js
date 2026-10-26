@@ -229,8 +229,9 @@ export class Scene {
 
   // Motion 'off': time stands still for everything decorative, and state changes
   // (voting, reveal, joining) jump straight to their end pose.
-  // Motion 'minimal': the room lives (window, plant, paper balls) but people move
-  // at half speed with smaller hops, and the ceiling lights hold still.
+  // Motion 'minimal': the room is a still picture except for slow ceiling lights;
+  // people skip idle breathing and move at half speed, and what people do
+  // (scribbling, raising signs, cheering, paper balls, emotes) still plays.
   setMotion(mode) {
     const still = mode === 'off';
     this.still = still;
@@ -261,11 +262,13 @@ export class Scene {
     // string lights
     for (let x = 4, i = 0; x < LW; x += 9, i++) {
       R(ctx, x, 3 + (i % 2), 3, 1, PAL.border);
-      const on = this.calm || Math.floor(t / 600 + i) % 3 !== 0;
+      // minimal motion keeps only the lights, at a slower pace
+      const on = Math.floor((this.calm ? t / 3.5 : t) / 600 + i) % 3 !== 0;
       R(ctx, x + 1, 4 + (i % 2), 1, 2, on ? CONFETTI[i % 5] : PAL.border);
     }
 
-    // window: a starry night in the dark theme, a sunny day in the light one
+    // window: a starry night in the dark theme, a sunny day in the light one (a still picture in minimal motion)
+    const tw = this.calm ? 0 : t;
     const wx = 8;
     const wy = 9;
     const ww = Math.min(44, Math.floor(LW / 4));
@@ -280,7 +283,7 @@ export class Scene {
         [0, 4],
         [1, 10],
       ]) {
-        const cx = wx + ((Math.floor(t / 400) + i * 23) % (ww + 12)) - 8;
+        const cx = wx + ((Math.floor(tw / 400) + i * 23) % (ww + 12)) - 8;
         R(ctx, Math.max(wx, cx), wy + cy, Math.max(0, Math.min(8, wx + ww - cx)), 2, PAL.white);
         R(ctx, Math.max(wx, cx + 2), wy + cy - 1, Math.max(0, Math.min(4, wx + ww - cx - 2)), 1, PAL.white);
       }
@@ -288,7 +291,7 @@ export class Scene {
       R(ctx, wx + ww - 9, wy + 4, 5, 5, PAL.moon);
       R(ctx, wx + ww - 8, wy + 4, 2, 2, PAL.sky);
       for (const s of this.stars) {
-        const on = (t + s.p) % 3000 > 400;
+        const on = (tw + s.p) % 3000 > 400;
         if (on) R(ctx, wx + 1 + Math.floor(s.x * (ww - 12)), wy + 1 + Math.floor(s.y * 14), 1, 1, s.x > 0.6 ? PAL.cyan : PAL.white);
       }
     }
@@ -318,18 +321,28 @@ export class Scene {
     if (mx > px + 26) {
       R(ctx, mx - 2, 7, mw + 4, 24, PAL.ink);
       R(ctx, mx, 9, mw, 20, PAL.screen);
+      const steady = this.still || this.calm;
       let text;
       let color = PAL.tealDark;
+      let blinkColon = false;
       if (this.room.timerEnd && !this.room.revealed) {
         const left = Math.max(0, Math.ceil((this.room.timerEnd - Date.now()) / 1000));
         text = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
-        color = left <= 10 ? (Math.floor(t / 250) % 2 ? PAL.red : shade(PAL.red, -0.35)) : PAL.teal;
+        color = left <= 10 ? (steady || Math.floor(t / 250) % 2 ? PAL.red : shade(PAL.red, -0.35)) : PAL.teal;
       } else {
         const d = new Date();
-        text = `${String(d.getHours()).padStart(2, '0')}${this.still || Math.floor(t / 1000) % 2 ? ':' : ' '}${String(d.getMinutes()).padStart(2, '0')}`;
+        text = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+        blinkColon = !steady && Math.floor(t / 1000) % 2 === 0;
       }
+      // size from the text with its colon, so a blinking colon never changes the digit size
       const s = textWidth(text, 2) <= mw - 4 ? 2 : 1;
-      drawText(ctx, text, mx + Math.floor((mw - textWidth(text, s)) / 2), 9 + Math.floor((20 - 5 * s) / 2), color, s);
+      const x0 = mx + Math.floor((mw - textWidth(text, s)) / 2);
+      const y0 = 9 + Math.floor((20 - 5 * s) / 2);
+      drawText(ctx, text, x0, y0, color, s);
+      if (blinkColon) {
+        const i = text.indexOf(':');
+        drawText(ctx, ':', x0 + textWidth(text.slice(0, i), s) + s, y0, PAL.screen, s);
+      }
       R(ctx, mx + mw / 2 - 3, 31, 6, 3, PAL.ink);
     }
 
@@ -338,7 +351,7 @@ export class Scene {
       const plx = mx > px + 26 ? mx - 18 : LW - 16;
       R(ctx, plx, WH - 10, 9, 7, PAL.plantPot);
       R(ctx, plx - 1, WH - 11, 11, 2, shade(PAL.plantPot, 0.08));
-      const sway = Math.floor(t / 900) % 2;
+      const sway = this.calm ? 0 : Math.floor(t / 900) % 2;
       R(ctx, plx + 3, WH - 20, 2, 9, PAL.leafDark);
       R(ctx, plx - 1 + sway, WH - 18, 4, 3, PAL.leaf);
       R(ctx, plx + 5 - sway, WH - 22, 4, 3, PAL.leaf);
@@ -380,7 +393,8 @@ export class Scene {
     // people keep their own clock: at half speed in minimal motion
     const tp = calm ? t / 2 : t;
     const join = still ? 1 : Math.min(1, (now - a.joinT) / 450);
-    let bob = still ? 0 : Math.round((1 - join) * 26) + (Math.floor((tp + a.seed * 13) / 700) % 2 ? 0 : -1);
+    // idle breathing is decoration: off in minimal motion, joining still slides in
+    let bob = still ? 0 : Math.round((1 - join) * 26) + (calm || Math.floor((tp + a.seed * 13) / 700) % 2 ? 0 : -1);
 
     let pose;
     let raise = 1;
