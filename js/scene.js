@@ -384,7 +384,7 @@ export class Scene {
     const badgeY = hy - 15 + (Math.floor(t / 400) % 2 ? 0 : -1);
     if (pose === 'voted') drawBadgeCheck(ctx, cx - 4, badgeY);
     if (pose === 'spectator' && !a.emote) {
-      drawEmoteBubble(ctx, 'eye', cx + 5, hy - 12);
+      drawEmoteBubble(ctx, 'eye', cx + 5, hy - 13);
     }
 
     let bubble = null;
@@ -396,9 +396,9 @@ export class Scene {
     if (bubble) {
       const pop = a.emote && now < a.emoteUntil ? Math.min(1, (2600 - (a.emoteUntil - now)) / 120) : 1;
       if (pop >= 1) {
-        drawEmoteBubble(ctx, bubble, cx + 5, hy - 13);
+        drawEmoteBubble(ctx, bubble, cx + 5, hy - 14);
       } else {
-        R(ctx, cx + 7, hy - 8, 4, 4, PAL.white);
+        R(ctx, cx + 8, hy - 11, 4, 4, PAL.white); // pop-in, at the bubble centre
       }
     }
 
