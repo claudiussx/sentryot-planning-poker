@@ -689,11 +689,47 @@ function throwAt(id) {
 // one line of plain text: no control or direction-changing characters, bounded length
 function cleanChat(text) {
   if (typeof text !== 'string') return '';
-  return text
-    .replace(/[\u0000-\u001f\u007f\u200b-\u200f\u202a-\u202e\u2066-\u2069]/g, ' ')
+  // the zero-width joiner (U+200D) stays: it glues combined emoji like the person-at-a-laptop one
+  const clean = text
+    .replace(/[\u0000-\u001f\u007f\u200b\u200c\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, ' ')
     .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, MAX_CHAT_LENGTH);
+    .trim();
+  // cut by characters, not UTF-16 units, so an emoji is never split in half
+  return Array.from(clean).slice(0, MAX_CHAT_LENGTH).join('');
+}
+
+// ---------- emoji picker ----------
+
+const CHAT_EMOJI = ['😀', '😂', '🤣', '😅', '😊', '😍', '😎', '🤔', '😬', '🙈', '😴', '🤯', '😱', '🥳', '🙌', '👏', '👍', '👎', '💪', '🙏', '🔥', '🎉', '🚀', '💯', '❤️', '☕', '🍕', '✅', '❌', '⏰', '👀', '🐛'];
+
+function buildEmojiPanel() {
+  const panel = $('#emoji-panel');
+  panel.replaceChildren(
+    ...CHAT_EMOJI.map((emoji) => {
+      const b = el('button', 'emoji-opt', emoji);
+      b.type = 'button';
+      b.setAttribute('aria-label', `Insert ${emoji}`);
+      b.onclick = () => insertEmoji(emoji);
+      return b;
+    }),
+  );
+}
+
+// goes in where the cursor is; the panel stays open for a second pick
+function insertEmoji(emoji) {
+  const input = $('#chat-input');
+  const start = input.selectionStart ?? input.value.length;
+  const end = input.selectionEnd ?? input.value.length;
+  const next = input.value.slice(0, start) + emoji + input.value.slice(end);
+  if (next.length > input.maxLength) return;
+  input.value = next;
+  input.focus();
+  input.setSelectionRange(start + emoji.length, start + emoji.length);
+}
+
+function toggleEmojiPanel(open = $('#emoji-panel').hidden) {
+  $('#emoji-panel').hidden = !open;
+  $('#emoji-btn').setAttribute('aria-expanded', String(open));
 }
 
 function sendChat(raw) {
@@ -876,6 +912,8 @@ function wireRoomControls() {
   $('#reveal').onclick = reveal;
   $('#next').onclick = nextRound;
   $('#chat-pill').onclick = jumpToLatestChat;
+  buildEmojiPanel();
+  $('#emoji-btn').onclick = () => toggleEmojiPanel();
   $('#chat-input').addEventListener('focus', () => setTyping(true));
   $('#chat-input').addEventListener('blur', () => setTyping(false));
   $('#chat-log').addEventListener('scroll', () => {
@@ -885,6 +923,7 @@ function wireRoomControls() {
     e.preventDefault();
     sendChat($('#chat-input').value);
     $('#chat-input').value = '';
+    toggleEmojiPanel(false);
   };
   document.querySelectorAll('[data-timer]').forEach((b) => (b.onclick = () => setTimer(Number(b.dataset.timer))));
   $('#auto-reveal').onchange = (e) => {
@@ -993,6 +1032,7 @@ function iconCanvas(name) {
 
 function paintGears() {
   document.querySelectorAll('.settings-btn').forEach((b) => b.replaceChildren(iconCanvas('gear')));
+  $('#emoji-btn')?.replaceChildren(iconCanvas('smile'));
 }
 
 function renderSettingsMenu() {
@@ -1049,9 +1089,13 @@ function wireSettings() {
   document.addEventListener('click', (e) => {
     // a clicked menu item is redrawn (and so detached) by the time this runs: that is not an outside click
     if (e.target.isConnected && !e.target.closest('#settings-menu')) closeSettings();
+    if (e.target.isConnected && !e.target.closest('#emoji-panel, #emoji-btn')) toggleEmojiPanel(false);
   });
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') closeSettings({ refocus: true });
+    if (e.key === 'Escape') {
+      closeSettings({ refocus: true });
+      toggleEmojiPanel(false);
+    }
   });
   window.addEventListener('resize', () => closeSettings());
 }

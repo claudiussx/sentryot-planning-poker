@@ -8,11 +8,11 @@
     <meta name="theme-color" content="#16132a" />
     <meta name="referrer" content="no-referrer" />
     <!-- CSP_START: npm run bump rewrites the importmap hash -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'sha256-ckrcrF6Wtle+ssoAgnXK1YW5edBNwKfrWVEOsx2FFEU='; style-src 'self'; font-src 'self'; img-src 'self' data:; connect-src wss://broker.hivemq.com:8884 wss://broker.emqx.io:8084 wss://test.mosquitto.org:8081; worker-src blob:; base-uri 'none'; form-action 'none'" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'sha256-9BDtglb1GRP2rxtRcoDIlZrYk7Wj3pTJO0Y0JgxkuVc='; style-src 'self'; font-src 'self'; img-src 'self' data:; connect-src wss://broker.hivemq.com:8884 wss://broker.emqx.io:8084 wss://test.mosquitto.org:8081; worker-src blob:; base-uri 'none'; form-action 'none'" />
     <!-- CSP_END -->
     <link rel="icon" type="image/svg+xml" href="assets/mark.svg" />
-    <link rel="stylesheet" href="css/style.css?v=20" />
-    <script src="js/boot.js?v=20"></script>
+    <link rel="stylesheet" href="css/style.css?v=22" />
+    <script src="js/boot.js?v=22"></script>
   </head>
   <body>
     <!-- ============ LOBBY ============ -->
@@ -135,7 +135,9 @@
               <span class="chat-pill-text">1 new message</span>
               <span class="chat-pill-arrow" aria-hidden="true"></span>
             </button>
+            <div id="emoji-panel" class="emoji-panel" role="group" aria-label="Emoji" hidden></div>
             <form id="chat-form" class="chat-form" autocomplete="off">
+              <button type="button" id="emoji-btn" class="btn btn-icon emoji-btn" aria-label="Emoji" title="Emoji" aria-expanded="false"></button>
               <input id="chat-input" maxlength="200" placeholder="Say something..." aria-label="Chat message" />
               <button type="submit" class="btn btn-primary btn-small">Send</button>
             </form>
@@ -152,17 +154,17 @@
     <script type="importmap">
       {
         "imports": {
-          "./js/main.js": "./js/main.js?v=20",
-          "./js/net.js": "./js/net.js?v=20",
-          "./js/scene.js": "./js/scene.js?v=20",
-          "./js/sprites.js": "./js/sprites.js?v=20",
-          "./js/stats.js": "./js/stats.js?v=20",
-          "./js/audio.js": "./js/audio.js?v=20",
-          "./js/room-name.js": "./js/room-name.js?v=20",
-          "./vendor/mqtt.esm.js": "./vendor/mqtt.esm.js?v=20"
+          "./js/main.js": "./js/main.js?v=22",
+          "./js/net.js": "./js/net.js?v=22",
+          "./js/scene.js": "./js/scene.js?v=22",
+          "./js/sprites.js": "./js/sprites.js?v=22",
+          "./js/stats.js": "./js/stats.js?v=22",
+          "./js/audio.js": "./js/audio.js?v=22",
+          "./js/room-name.js": "./js/room-name.js?v=22",
+          "./vendor/mqtt.esm.js": "./vendor/mqtt.esm.js?v=22"
         }
       }
     </script>
-    <script type="module" src="js/main.js?v=20"></script>
+    <script type="module" src="js/main.js?v=22"></script>
   </body>
 </html>
