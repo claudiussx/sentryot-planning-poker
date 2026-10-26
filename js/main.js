@@ -1001,11 +1001,13 @@ const SETTINGS = [
   {
     icon: () => 'font',
     label: () => 'Font',
-    value: () => (root.dataset.font === 'normal' ? 'Normal' : 'Pixel'),
+    value: () => ({ minecraft: 'Minecraft', normal: 'Normal' })[root.dataset.font] || 'Pixel',
+    // cycles Pixel -> Minecraft -> Normal
     toggle: () => {
-      if (root.dataset.font === 'normal') delete root.dataset.font;
-      else root.dataset.font = 'normal';
-      saveRaw('sop.font', root.dataset.font || 'pixel');
+      const next = { minecraft: 'normal', normal: 'pixel' }[root.dataset.font] || 'minecraft';
+      if (next === 'pixel') delete root.dataset.font;
+      else root.dataset.font = next;
+      saveRaw('sop.font', next);
       state.scene?.layout(); // name plates measure their text
     },
   },

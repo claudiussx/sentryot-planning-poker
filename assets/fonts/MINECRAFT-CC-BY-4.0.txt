@@ -1,0 +1,7 @@
+"Minecraft" font by Craftron Gaming
+Source: https://www.fontrepo.com/font/29649/minecraft
+License: Creative Commons Attribution 4.0 International (CC BY 4.0)
+https://creativecommons.org/licenses/by/4.0/
+
+Used unmodified in Pixel Poker as an optional interface font.
+This font is fan-made and is not affiliated with Mojang or Microsoft.

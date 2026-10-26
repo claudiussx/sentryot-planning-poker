@@ -10,6 +10,15 @@
   src: url('../assets/fonts/geist-pixel-square.woff2') format('woff2');
 }
 
+/* "Minecraft" by Craftron Gaming, CC BY 4.0 (assets/fonts/MINECRAFT-CC-BY-4.0.txt), self-hosted. */
+@font-face {
+  font-family: 'Minecraft';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('../assets/fonts/minecraft.ttf') format('truetype');
+}
+
 :root {
   --page: #16132a;
   --body: #1c1834;
@@ -1238,6 +1247,13 @@ input::placeholder {
   }
 }
 
+/* ---------- Minecraft font mode: letters it lacks (accents) fall back to Geist Pixel ---------- */
+
+:root[data-font='minecraft'] {
+  --font: 'Minecraft', 'Geist Pixel', ui-monospace, monospace;
+  --font-display: 'Minecraft', 'Geist Pixel', ui-monospace, monospace;
+}
+
 /* ---------- normal font mode ---------- */
 
 :root[data-font='normal'] {
@@ -1682,35 +1698,4 @@ input::placeholder {
   animation-duration: 1ms !important;
   animation-iteration-count: 1 !important;
   transition-duration: 1ms !important;
-}
-
-/* ---------- pixel bold ----------
-   Geist Pixel has a single weight and faking one in the browser smears the pixels.
-   One font pixel is 0.075em (its strokes measure 30px at a 400px size), so a shadow
-   offset by exactly that much to the right thickens every stroke by one pixel and
-   stays on the grid. Only in the pixel font: the normal font has a real bold. */
-:root {
-  --pixel-bold: 0.075em 0 0 currentColor;
-}
-
-:root:not([data-font='normal']) :is(.topbar-title, .panel h2, .round-chip, .host-chip, .btn, .card, .plate-name, .p-name, .chat-name, .menu-label, .res-tile .k, .field > span) {
-  text-shadow: var(--pixel-bold);
-}
-
-/* titles that already carry a drop shadow keep it, with the bold underneath */
-:root:not([data-font='normal']) .lobby-brand h1 {
-  text-shadow:
-    var(--pixel-bold),
-    4px 4px 0 var(--ink),
-    0 0 18px var(--accent-15);
-}
-
-:root:not([data-font='normal']) .res-tile.is-main .v {
-  text-shadow:
-    var(--pixel-bold),
-    3px 3px 0 var(--ink);
-}
-
-:root:not([data-font='normal']) .res-tile .v {
-  text-shadow: var(--pixel-bold);
 }

@@ -5,7 +5,8 @@
     var theme = localStorage.getItem('sop.theme');
     if (theme !== 'light' && theme !== 'dark') theme = matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
     root.dataset.theme = theme;
-    if (localStorage.getItem('sop.font') === 'normal') root.dataset.font = 'normal';
+    var font = localStorage.getItem('sop.font');
+    if (font === 'normal' || font === 'minecraft') root.dataset.font = font;
     var motion = localStorage.getItem('sop.motion');
     // minimal motion unless the person picked something else
     if (motion !== 'on' && motion !== 'minimal' && motion !== 'off') motion = 'minimal';
