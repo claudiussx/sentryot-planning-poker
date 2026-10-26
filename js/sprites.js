@@ -196,12 +196,12 @@ export function drawText(ctx, text, x, y, color, s = 1) {
 
 const ICONS = {
   heart: ['.##.##.', '#######', '#######', '.#####.', '..###..', '...#...'],
-  bang: ['..##...', '..##...', '..##...', '..##...', '.......', '..##...', '..##...'],
-  question: ['.####..', '##..##.', '....##.', '...##..', '..##...', '.......', '..##...'],
+  bang: ['..###..', '..###..', '..###..', '...#...', '.......', '..###..', '..###..'],
+  question: ['..###..', '.##.##.', '....##.', '...##..', '...#...', '.......', '...#...'],
   smile: ['.#####.', '#.....#', '#.#.#.#', '#.....#', '#.###.#', '#.....#', '.#####.'],
-  coffee: ['..s..s..', '.s..s...', '........', 'llllll..', '#######.', '######.#', '#######.', '.####...'],
-  zzz: ['####...', '..#....', '.#.....', '####...', '...###.', '....#..', '...###.'],
-  thumb: ['...#...', '..##...', '..##...', '#.####.', '#.####.', '#.####.', '#.###..'],
+  coffee: ['.s..s..', '..s..s.', 'lllll..', '######.', '#####.#', '######.', '.###...'],
+  zzz: ['###....', '..#....', '.#.....', '###....', '....###', '.....#.', '....###'],
+  thumb: ['....#..', '...##..', '...##..', '#.#####', '#.#####', '#.#####', '#.####.'],
   fire: ['...#...', '..##...', '.###.#.', '.#####.', '###.###', '##...##', '.#####.'],
   // a teal mug sized for the vote sign
   mug: ['...s..s.....', '..s..s......', '...s..s.....', '............', '.tttttttt...', '.tbbbbbbtt..', '.tttttttt.t.', '.tttttttt.t.', '.ttttttttt..', '..tttttt....'],
@@ -210,7 +210,7 @@ const ICONS = {
   star: ['...#...', '..###..', '#######', '.#####.', '..###..', '.##.##.', '.#...#.'],
   idea: ['..###..', '.#####.', '.#####.', '.#####.', '..###..', '..sss..', '...s...'],
   rocket: ['...#...', '..###..', '..#c#..', '..###..', '.#####.', '.#.o.#.', '...o...'],
-  clock: ['.kkkkk.', 'k..k..k', 'k..k..k', 'k..kk.k', 'k.....k', 'k.....k', '.kkkkk.'],
+  clock: ['.#####.', '#..r..#', '#..r..#', '#..rr.#', '#.....#', '#.....#', '.#####.'],
   angry: ['.#####.', '#k###k#', '##k#k##', '#######', '##kkk##', '#k###k#', '.#####.'],
   skull: ['.#####.', '#######', '#..#..#', '#..#..#', '###.###', '.#####.', '.#.#.#.'],
   ghost: ['..###..', '.#####.', '#k##k##', '#######', '#######', '#######', '#.#.#.#'],
@@ -234,6 +234,7 @@ const ICON_COLORS = {
   star: 'gold',
   idea: 'gold',
   rocket: 'red',
+  clock: 'cyan',
   angry: 'red',
   skull: 'secondary',
   ghost: '#b9a8ff',
@@ -308,16 +309,30 @@ export function drawMark(ctx, x, y, s = 1) {
   });
 }
 
+// The box around an icon's drawn pixels: some icons sit off-centre inside their own grid.
 export function iconSize(name) {
   const rows = ICONS[name] || [];
-  return { w: Math.max(0, ...rows.map((r) => r.length)), h: rows.length };
+  let x0 = Infinity;
+  let x1 = -1;
+  let y0 = Infinity;
+  let y1 = -1;
+  rows.forEach((row, y) => {
+    for (let x = 0; x < row.length; x++) {
+      if (row[x] === '.') continue;
+      x0 = Math.min(x0, x);
+      x1 = Math.max(x1, x);
+      y0 = Math.min(y0, y);
+      y1 = Math.max(y1, y);
+    }
+  });
+  return x1 < 0 ? { x0: 0, y0: 0, w: 0, h: 0 } : { x0, y0, w: x1 - x0 + 1, h: y1 - y0 + 1 };
 }
 
-// Draws an icon centred in a w x h box: icons differ in size, so a fixed corner sits them off-centre.
+// Draws an icon centred in a w x h box by its drawn pixels, not its grid.
 // An odd spare row goes above the icon: the bubble's tail already adds white below.
 export function drawIconCentered(ctx, name, x, y, w, h) {
-  const size = iconSize(name);
-  drawIcon(ctx, name, x + Math.floor((w - size.w) / 2), y + Math.ceil((h - size.h) / 2));
+  const b = iconSize(name);
+  drawIcon(ctx, name, x + Math.floor((w - b.w) / 2) - b.x0, y + Math.ceil((h - b.h) / 2) - b.y0);
 }
 
 // Speech bubble with an icon: 11 x 11 plus the tail, a 9 x 9 inside so 7-pixel icons get even margins.

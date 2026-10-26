@@ -38,15 +38,15 @@
   --value: #d9d3f2;
   --secondary: #a49cd0;
   --muted: #7a72a8;
-  --accent: #ffc93c; /* call to action */
-  --accent-hover: #ffd866;
-  --accent-active: #e6ae1f;
-  --accent-15: #ffc93c26;
-  --accent-2: #4de0c0; /* highlights: chips, you, active things */
+  --accent: #4de0c0; /* call to action: neon mint on the night palette */
+  --accent-hover: #7aebd3;
+  --accent-active: #2bb597;
+  --accent-15: #4de0c026;
+  --accent-2: #ff8fd0; /* highlights: chips, focus rings */
   --red: #ff5d73;
   --green: #5ee27a;
   --gold: #ffc93c;
-  --gold-text: #ffc93c; /* gold used as text, darker in light mode to stay readable */
+  --gold-text: #7aebd3; /* the accent as text: mint at night, a darker gold by day */
   --paper: #f7f3ff; /* card faces and vote values */
   --paper-shade: #a8a0c8;
   --plate-bg: #0d0b1a;
@@ -54,7 +54,7 @@
   --toast-bg: #0d0b1a;
   --toast-text: #fff8ee;
   --shadow: #00000066;
-  --tint: #8b6cff1f;
+  --tint: #4de0c014;
   --scanline: #ffffff05;
   --good-bg: #5ee27a22;
   --good-fg: #a6f5b9;
@@ -115,6 +115,15 @@ body {
   font-family: var(--font);
   font-size: 16px;
   -webkit-font-smoothing: none;
+  /* the pixel font's "fi" ligature reads as "A": "final" would show as "Anal" */
+  font-variant-ligatures: none;
+  font-feature-settings: 'liga' 0, 'clig' 0;
+}
+
+button,
+input {
+  font-variant-ligatures: none;
+  font-feature-settings: 'liga' 0, 'clig' 0;
 }
 
 body {
@@ -188,7 +197,7 @@ button {
 }
 
 .btn:hover {
-  --btn-bg: var(--border);
+  --btn-edge: var(--accent);
 }
 
 .btn:active:not(:disabled) {
@@ -228,7 +237,7 @@ button {
 
 .btn-small.is-active {
   --btn-bg: var(--accent-15);
-  color: var(--accent-2);
+  color: var(--gold-text);
 }
 
 .btn-big {
@@ -461,7 +470,7 @@ input::placeholder {
   margin: 0;
   padding: 10px 12px;
   background: var(--accent-15);
-  color: var(--accent-2);
+  color: var(--gold-text);
 }
 
 .footnote {
@@ -763,8 +772,8 @@ input::placeholder {
 }
 
 .emote-btn canvas {
-  width: 24px;
-  height: 24px;
+  width: 27px;
+  height: 27px;
   image-rendering: pixelated;
 }
 
@@ -863,8 +872,8 @@ input::placeholder {
 }
 
 .card canvas {
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   image-rendering: pixelated;
 }
 
@@ -1221,8 +1230,8 @@ input::placeholder {
   }
 
   .emote-btn canvas {
-    width: 16px;
-    height: 16px;
+    width: 18px;
+    height: 18px;
   }
 
   .hint {

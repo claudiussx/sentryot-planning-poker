@@ -762,9 +762,9 @@ function buildHand() {
     b.dataset.value = v;
     if (v === 'coffee') {
       const c = document.createElement('canvas');
-      c.width = 8;
-      c.height = 8;
-      drawIconCentered(c.getContext('2d'), 'coffee', 0, 0, 8, 8);
+      c.width = 9;
+      c.height = 9;
+      drawIconCentered(c.getContext('2d'), 'coffee', 0, 0, 9, 9);
       b.append(c);
       b.setAttribute('aria-label', 'Coffee break');
       b.title = 'I need a break';
@@ -787,10 +787,11 @@ function buildEmotes() {
     b.className = 'btn emote-btn';
     b.setAttribute('aria-label', `React: ${EMOTE_NAMES[icon]}`);
     b.title = EMOTE_NAMES[icon];
+    // 9 x 9 like the inside of a speech bubble: an odd size centres the 7-pixel icons exactly
     const c = document.createElement('canvas');
-    c.width = 8;
-    c.height = 8;
-    drawIconCentered(c.getContext('2d'), icon, 0, 0, 8, 8);
+    c.width = 9;
+    c.height = 9;
+    drawIconCentered(c.getContext('2d'), icon, 0, 0, 9, 9);
     b.append(c);
     b.onclick = () => sendEmote(icon);
     box.append(b);
