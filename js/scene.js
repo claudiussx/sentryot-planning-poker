@@ -27,6 +27,7 @@ export class Scene {
     this.particles = [];
     this.balls = [];
     this.room = { revealed: false, consensus: false, timerEnd: null };
+    this.still = false;
     this.stars = Array.from({ length: 14 }, (_, i) => {
       const r = rng(i + 11);
       return { x: r(), y: r(), p: r() * 3000 };
@@ -97,6 +98,12 @@ export class Scene {
     const from = this.seats.get(fromId);
     const to = this.seats.get(toId);
     if (!from || !to) return;
+    // without motion the ball lands at once: the target just shows the "!" bubble
+    if (this.still) {
+      const a = this.anim.get(toId);
+      if (a) a.hitT = performance.now();
+      return;
+    }
     this.balls.push({ fx: from.cx + 6, fy: from.dy - 14, tx: to.cx, ty: to.dy - 20, start: performance.now(), dur: 700, toId });
   }
 
@@ -189,6 +196,7 @@ export class Scene {
   // ---------- effects ----------
 
   poof(x, y, n = 10, colors = [PAL.value, PAL.secondary, PAL.white]) {
+    if (this.still) return;
     for (let i = 0; i < n; i++) {
       const ang = (Math.PI * 2 * i) / n + Math.random() * 0.5;
       const sp = 0.4 + Math.random() * 0.6;
@@ -197,6 +205,7 @@ export class Scene {
   }
 
   confetti() {
+    if (this.still) return;
     const now = performance.now();
     for (let i = 0; i < 110; i++) {
       this.particles.push({
@@ -217,9 +226,19 @@ export class Scene {
 
   // ---------- drawing ----------
 
+  // Motion off: time stands still for everything decorative, and state changes
+  // (voting, reveal, joining) jump straight to their end pose.
+  setStill(still) {
+    this.still = still;
+    if (still) {
+      this.particles = [];
+      this.balls = [];
+    }
+  }
+
   loop(t) {
     this.raf = requestAnimationFrame(this.loop);
-    this.draw(t);
+    this.draw(this.still ? 0 : t);
   }
 
   drawWall(t) {
@@ -302,7 +321,7 @@ export class Scene {
         color = left <= 10 ? (Math.floor(t / 250) % 2 ? PAL.red : shade(PAL.red, -0.35)) : PAL.teal;
       } else {
         const d = new Date();
-        text = `${String(d.getHours()).padStart(2, '0')}${Math.floor(t / 1000) % 2 ? ':' : ' '}${String(d.getMinutes()).padStart(2, '0')}`;
+        text = `${String(d.getHours()).padStart(2, '0')}${this.still || Math.floor(t / 1000) % 2 ? ':' : ' '}${String(d.getMinutes()).padStart(2, '0')}`;
       }
       const s = textWidth(text, 2) <= mw - 4 ? 2 : 1;
       drawText(ctx, text, mx + Math.floor((mw - textWidth(text, s)) / 2), 9 + Math.floor((20 - 5 * s) / 2), color, s);
@@ -351,8 +370,9 @@ export class Scene {
       this.poof(seat.cx, seat.dy - 14, 12, [PAL.teal, PAL.cyan, PAL.white]);
     }
     const { cx, dy } = seat;
-    const join = Math.min(1, (now - a.joinT) / 450);
-    let bob = Math.round((1 - join) * 26) + ((Math.floor((t + a.seed * 13) / 700) % 2) ? 0 : -1);
+    const still = this.still;
+    const join = still ? 1 : Math.min(1, (now - a.joinT) / 450);
+    let bob = still ? 0 : Math.round((1 - join) * 26) + (Math.floor((t + a.seed * 13) / 700) % 2 ? 0 : -1);
 
     let pose;
     let raise = 1;
@@ -360,20 +380,20 @@ export class Scene {
     if (p.spectator) pose = 'spectator';
     else if (revealed) {
       if (p.vote != null) {
-        raise = Math.max(0, (now - a.revealT) / 380);
+        raise = still ? 1 : Math.max(0, (now - a.revealT) / 380);
         pose = consensus && raise >= 1 ? 'cheer' : 'reveal';
-        if (raise > 0.7 && raise < 1.3) bob -= 2;
-        if (pose === 'cheer') bob = -Math.round(Math.abs(Math.sin((t + i * 160) / 170)) * 4);
+        if (!still && raise > 0.7 && raise < 1.3) bob -= 2;
+        if (pose === 'cheer') bob = still ? 0 : -Math.round(Math.abs(Math.sin((t + i * 160) / 170)) * 4);
       } else pose = 'shrug';
     } else if (p.voted) {
-      pose = now - a.scribbleStart < 1300 ? 'scribble' : 'voted';
+      pose = !still && now - a.scribbleStart < 1300 ? 'scribble' : 'voted';
     } else if (p.away || p.offline) pose = 'away';
     else pose = 'think';
 
     const hit = now - a.hitT;
     let shake = 0;
     if (hit < 650) {
-      shake = Math.floor(hit / 60) % 2 ? 1 : -1;
+      shake = still ? 0 : Math.floor(hit / 60) % 2 ? 1 : -1;
       face.mouth = 'o';
     }
 
@@ -407,7 +427,7 @@ export class Scene {
     else if (hit < 650) bubble = 'bang';
     else if (pose === 'away') bubble = 'zzz';
     else if (pose === 'shrug') bubble = 'question';
-    else if (pose === 'think' && ((t + a.seed * 71) % 9000) < 1600) bubble = 'question';
+    else if (pose === 'think' && !still && (t + a.seed * 71) % 9000 < 1600) bubble = 'question';
     if (bubble) {
       const pop = a.emote && now < a.emoteUntil ? Math.min(1, (2600 - (a.emoteUntil - now)) / 120) : 1;
       if (pop >= 1) {

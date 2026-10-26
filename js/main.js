@@ -159,7 +159,9 @@ function initLobby() {
   cancelAnimationFrame(lobbyRaf);
   const tick = (t) => {
     const pose = poses[Math.floor((t - start) / 2200) % poses.length];
-    drawPreview(canvas, state.me.look, t, $('#spectator').checked ? 'spectator' : pose, (t - start) % 2200);
+    // with motion off the preview is a still portrait
+    if (motionOn()) drawPreview(canvas, state.me.look, t, $('#spectator').checked ? 'spectator' : pose, (t - start) % 2200);
+    else drawPreview(canvas, state.me.look, 0, $('#spectator').checked ? 'spectator' : 'idle', 0);
     lobbyRaf = requestAnimationFrame(tick);
   };
   lobbyRaf = requestAnimationFrame(tick);
@@ -247,6 +249,7 @@ async function enterRoom(rc, { creating, roomName }) {
 
   if (!state.scene) {
     state.scene = new Scene($('#stage'), { onSeatClick: throwAt });
+    state.scene.setStill(!motionOn());
     buildHand();
     buildEmotes();
     wireRoomControls();
@@ -801,15 +804,9 @@ function buildEmotes() {
 function wireRoomControls() {
   $('#invite').onclick = () => copyText(location.href, 'Invite link copied. Paste it in the team chat.');
   $('#leave').onclick = leaveRoom;
-  $('#role-toggle').onclick = toggleRole;
   $('#reveal').onclick = reveal;
   $('#next').onclick = nextRound;
   $('#copy-estimates').onclick = () => copyText(estimatesText(), 'Estimates copied');
-  $('#mute').onclick = () => {
-    setMuted(!isMuted());
-    renderMute();
-  };
-  renderMute();
   document.querySelectorAll('[data-timer]').forEach((b) => (b.onclick = () => setTimer(Number(b.dataset.timer))));
   $('#auto-reveal').onchange = (e) => {
     if (amHost()) {
@@ -849,89 +846,148 @@ function wireRoomControls() {
   });
 }
 
-// Pixel font for the fun of it, a plain one for those who find it hard to read.
-function wireFontToggle() {
-  const label = () => (document.documentElement.dataset.font === 'normal' ? 'Font: Normal' : 'Font: Pixel');
-  const sync = () =>
-    document.querySelectorAll('.font-toggle').forEach((b) => {
-      b.textContent = label();
-      b.title = 'Switch between the pixel font and a normal font';
-    });
-  document.querySelectorAll('.font-toggle').forEach(
-    (b) =>
-      (b.onclick = () => {
-        const normal = document.documentElement.dataset.font !== 'normal';
-        if (normal) document.documentElement.dataset.font = 'normal';
-        else delete document.documentElement.dataset.font;
-        // raw string, not JSON: the inline script in index.html reads it before modules load
-        try {
-          localStorage.setItem('sop.font', normal ? 'normal' : 'pixel');
-        } catch {
-          /* blocked storage: the switch still works for this visit */
-        }
-        sync();
-        play('pick');
-        state.scene?.layout(); // name plates measure text
-      }),
-  );
-  sync();
+// ---------- settings: everything that is a preference lives behind the gear ----------
+
+const root = document.documentElement;
+const motionOn = () => root.dataset.motion !== 'off';
+
+// raw strings, not JSON: js/boot.js reads them before the modules load
+function saveRaw(key, value) {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    /* blocked storage: the choice still holds for this visit */
+  }
 }
 
-// Light or dark: the page and the pixel room both follow.
-function wireThemeToggle() {
-  const isLight = () => document.documentElement.dataset.theme === 'light';
-  const sync = () => {
-    setSceneTheme(isLight());
-    document.querySelectorAll('.theme-toggle').forEach((b) => {
-      b.textContent = isLight() ? 'Theme: Light' : 'Theme: Dark';
-      b.title = 'Switch between the light and the dark theme';
-    });
-    document.querySelector('meta[name="theme-color"]')?.setAttribute('content', isLight() ? '#f6efe2' : '#16132a');
-    if (state.rc) renderMute();
-  };
-  document.querySelectorAll('.theme-toggle').forEach(
-    (b) =>
-      (b.onclick = () => {
-        document.documentElement.dataset.theme = isLight() ? 'dark' : 'light';
-        // raw string, not JSON: js/boot.js reads it before modules load
-        try {
-          localStorage.setItem('sop.theme', document.documentElement.dataset.theme);
-        } catch {
-          /* blocked storage: the switch still works for this visit */
-        }
-        sync();
-        play('pick');
-      }),
-  );
-  sync();
+function applyTheme() {
+  const light = root.dataset.theme === 'light';
+  setSceneTheme(light);
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', light ? '#f6efe2' : '#16132a');
+  // icons are painted with the palette, so repaint them
+  paintGears();
+  if (state.scene) buildEmotes();
 }
 
-function renderMute() {
-  const b = $('#mute');
-  const css = getComputedStyle(document.documentElement);
-  b.innerHTML = '';
+const SETTINGS = [
+  {
+    inRoom: true,
+    icon: () => (state.me.spectator ? 'card' : 'eye'),
+    label: () => (state.me.spectator ? 'Switch to voter' : 'Switch to observer'),
+    value: () => '',
+    toggle: () => toggleRole(),
+  },
+  {
+    icon: () => (root.dataset.theme === 'light' ? 'sun' : 'moon'),
+    label: () => 'Theme',
+    value: () => (root.dataset.theme === 'light' ? 'Light' : 'Dark'),
+    toggle: () => {
+      root.dataset.theme = root.dataset.theme === 'light' ? 'dark' : 'light';
+      saveRaw('sop.theme', root.dataset.theme);
+      applyTheme();
+    },
+  },
+  {
+    icon: () => 'font',
+    label: () => 'Font',
+    value: () => (root.dataset.font === 'normal' ? 'Normal' : 'Pixel'),
+    toggle: () => {
+      if (root.dataset.font === 'normal') delete root.dataset.font;
+      else root.dataset.font = 'normal';
+      saveRaw('sop.font', root.dataset.font || 'pixel');
+      state.scene?.layout(); // name plates measure their text
+    },
+  },
+  {
+    icon: () => (isMuted() ? 'muted' : 'speaker'),
+    label: () => 'Sound',
+    value: () => (isMuted() ? 'Off' : 'On'),
+    toggle: () => setMuted(!isMuted()),
+  },
+  {
+    icon: () => (motionOn() ? 'wave' : 'pause'),
+    label: () => 'Motion',
+    value: () => (motionOn() ? 'On' : 'Off'),
+    toggle: () => {
+      root.dataset.motion = motionOn() ? 'off' : 'on';
+      saveRaw('sop.motion', root.dataset.motion);
+      state.scene?.setStill(!motionOn());
+    },
+  },
+];
+
+function iconCanvas(name) {
   const c = document.createElement('canvas');
   c.width = 9;
-  c.height = 7;
-  c.style.cssText = 'width:27px;height:21px;image-rendering:pixelated';
-  const ctx = c.getContext('2d');
-  ctx.fillStyle = css.getPropertyValue('--value').trim();
-  ctx.fillRect(0, 2, 2, 3);
-  ctx.fillRect(2, 1, 1, 5);
-  ctx.fillRect(3, 0, 1, 7);
-  if (isMuted()) {
-    ctx.fillStyle = css.getPropertyValue('--red').trim();
-    for (let i = 0; i < 4; i++) {
-      ctx.fillRect(5 + i, 1.5 + i, 1, 1);
-      ctx.fillRect(8 - i, 1.5 + i, 1, 1);
-    }
-  } else {
-    ctx.fillStyle = css.getPropertyValue('--accent-2').trim();
-    ctx.fillRect(5, 2, 1, 3);
-    ctx.fillRect(7, 1, 1, 5);
+  c.height = 9;
+  c.className = 'px-icon';
+  drawIconCentered(c.getContext('2d'), name, 0, 0, 9, 9);
+  return c;
+}
+
+function paintGears() {
+  document.querySelectorAll('.settings-btn').forEach((b) => b.replaceChildren(iconCanvas('gear')));
+}
+
+function renderSettingsMenu() {
+  const menu = $('#settings-menu');
+  menu.replaceChildren();
+  for (const item of SETTINGS) {
+    if (item.inRoom && !state.rc) continue;
+    const b = el('button', 'menu-item');
+    b.type = 'button';
+    b.setAttribute('role', 'menuitem');
+    b.append(iconCanvas(item.icon()), el('span', 'menu-label', item.label()), el('span', 'menu-value', item.value()));
+    b.onclick = () => {
+      item.toggle();
+      play('pick');
+      renderSettingsMenu();
+      menu.querySelectorAll('.menu-item')[[...SETTINGS].filter((x) => !x.inRoom || state.rc).indexOf(item)]?.focus();
+    };
+    menu.append(b);
   }
-  b.append(c);
-  b.title = isMuted() ? 'Sound off' : 'Sound on';
+}
+
+let menuAnchor = null;
+
+function openSettings(anchor) {
+  const menu = $('#settings-menu');
+  menuAnchor = anchor;
+  renderSettingsMenu();
+  menu.hidden = false;
+  const r = anchor.getBoundingClientRect();
+  menu.style.top = `${Math.round(r.bottom + 10)}px`;
+  menu.style.right = `${Math.max(8, Math.round(innerWidth - r.right))}px`;
+  anchor.setAttribute('aria-expanded', 'true');
+  menu.querySelector('.menu-item')?.focus();
+}
+
+function closeSettings({ refocus = false } = {}) {
+  const menu = $('#settings-menu');
+  if (menu.hidden) return;
+  menu.hidden = true;
+  menuAnchor?.setAttribute('aria-expanded', 'false');
+  if (refocus) menuAnchor?.focus();
+  menuAnchor = null;
+}
+
+function wireSettings() {
+  applyTheme();
+  document.querySelectorAll('.settings-btn').forEach((b) => {
+    b.onclick = (e) => {
+      e.stopPropagation();
+      if (menuAnchor === b) closeSettings();
+      else openSettings(b);
+    };
+  });
+  document.addEventListener('click', (e) => {
+    // a clicked menu item is redrawn (and so detached) by the time this runs: that is not an outside click
+    if (e.target.isConnected && !e.target.closest('#settings-menu')) closeSettings();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeSettings({ refocus: true });
+  });
+  window.addEventListener('resize', () => closeSettings());
 }
 
 // ============================================================
@@ -1014,9 +1070,6 @@ function render() {
     c.classList.toggle('is-selected', !!room && state.myRound === room.round && c.dataset.value === state.myVote);
   });
   $('#hand').hidden = state.me.spectator;
-  const role = $('#role-toggle');
-  role.textContent = state.me.spectator ? 'Switch to voter' : 'Switch to observer';
-  role.title = state.me.spectator ? 'Take a card and vote' : 'Watch without voting';
 
   // scene
   const revealedVotes = players.filter((p) => p.vote != null);
@@ -1191,8 +1244,7 @@ if (new URLSearchParams(location.search).has('debug')) window.sopDebug = () => (
 
 (async function boot() {
   state.me.id = await resolveMyId();
-  wireFontToggle();
-  wireThemeToggle();
+  wireSettings();
   initLobby();
   // a reload of a tab that was already seated goes straight back to its chair
   const invite = parseHash();
