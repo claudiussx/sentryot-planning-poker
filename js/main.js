@@ -1368,7 +1368,7 @@ function render() {
   const stats = computeStats(revealedVotes, room?.deck);
   if (room?.revealed && revealedVotes.length) recordRound(room, revealedVotes);
   const allIn = players.filter((p) => p.voted).every((p) => p.vote != null);
-  state.scene.setRoom({ revealed: !!room?.revealed, consensus: !!room?.revealed && allIn && stats.consensus, timerEnd: room?.timerEnd });
+  state.scene.setRoom({ revealed: !!room?.revealed, consensus: !!room?.revealed && allIn && stats.consensus, timerEnd: room?.timerEnd, round: room?.label ?? room?.round });
   state.scene.setPlayers(players);
 
   renderPlayers(players, host);

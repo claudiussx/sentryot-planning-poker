@@ -359,7 +359,164 @@ export class Scene {
       // the corner where the walls meet
       R(ctx, edge - (side < 0 ? 1 : 0), 0, 1, WH, shade(PAL.wall, -0.09));
     }
+    // a door on the left wall and a dartboard on the right, both seen at an angle
+    const wallY = (edge, px, by) => vy + ((by - vy) * (mid - px)) / (mid - edge);
+    if (m >= 14) {
+      this.paintDoor(ctx, (px, by) => wallY(m, px, by), Math.round(m * 0.25), Math.round(m * 0.7), cabin);
+      this.paintDartboard(ctx, (px, by) => wallY(LW - m, px, by), LW - m + Math.round(m * 0.5), m);
+    }
     return c;
+  }
+
+  paintDoor(ctx, wallY, x0, x1, cabin) {
+    const wood = cabin ? shade(PAL.border, 0.04) : shade(PAL.border, 0.06);
+    const frame = shade(PAL.border, -0.12);
+    for (let px = x0; px <= x1; px++) {
+      const top = Math.round(wallY(px, 10));
+      const foot = Math.round(wallY(px, WH));
+      R(ctx, px, top, 1, foot - top, px === x0 || px === x1 ? frame : wood);
+      R(ctx, px, top, 1, 2, frame);
+      if (cabin && (px - x0) % 3 === 0 && px > x0 && px < x1) R(ctx, px, top + 2, 1, foot - top - 2, shade(wood, -0.1));
+      // two inset panels on the office door
+      if (!cabin && px > x0 + 1 && px < x1 - 1) {
+        for (const [a, b] of [
+          [14, 26],
+          [29, WH - 6],
+        ]) {
+          const ya = Math.round(wallY(px, a));
+          const yb = Math.round(wallY(px, b));
+          R(ctx, px, ya, 1, 1, shade(wood, -0.12));
+          R(ctx, px, yb, 1, 1, shade(wood, 0.08));
+        }
+      }
+    }
+    // the handle on the side nearer to us
+    const kx = x0 + 2;
+    R(ctx, kx, Math.round(wallY(kx, 30)), 2, 2, PAL.gold);
+  }
+
+  paintDartboard(ctx, wallY, cx, m) {
+    const r = 9;
+    const rx = Math.max(4, Math.round(m * 0.3));
+    const dark = '#1b1730';
+    const light = '#f1e6c8';
+    for (let px = cx - rx; px <= cx + rx; px++) {
+      const u = (px - cx) / rx;
+      if (Math.abs(u) > 1) continue;
+      const cy = wallY(px, 24);
+      const span = wallY(px, 24 + r) - cy;
+      const hh = Math.sqrt(1 - u * u) * span;
+      for (let py = Math.round(cy - hh); py <= Math.round(cy + hh); py++) {
+        const v = (py - cy) / span;
+        const d = Math.sqrt(u * u + v * v);
+        // bull, a green ring, cream and black wedges, a red and green double ring, a black rim
+        const seg = Math.floor(((Math.atan2(v, u) + Math.PI) / (2 * Math.PI)) * 8) % 2;
+        let ink;
+        if (d < 0.2) ink = PAL.red;
+        else if (d < 0.36) ink = PAL.green;
+        else if (d >= 0.84) ink = dark;
+        else if (d >= 0.68) ink = seg ? PAL.red : PAL.green;
+        else ink = seg ? dark : light;
+        R(ctx, px, py, 1, 1, ink);
+      }
+    }
+    // a dart in it, flights out towards us
+    const px = cx - 1;
+    const py = Math.round(wallY(px, 21));
+    R(ctx, px - 3, py, 3, 1, PAL.ink);
+    R(ctx, px - 4, py - 1, 1, 3, PAL.teal);
+  }
+
+  // floor furniture in the back corners: drawn after the back wall, so it stands in front of it
+  drawCornerProps() {
+    const { LW } = this;
+    const key = [this.shellKey, 'props'].join('|');
+    if (this.propsKey !== key) {
+      this.propsKey = key;
+      const c = document.createElement('canvas');
+      c.width = LW;
+      c.height = this.LH;
+      const ctx = c.getContext('2d');
+      const m = this.side;
+      const cabin = SCENE.style === 'cabin';
+      if (LW >= 150) {
+        this.paintBigPlant(ctx, m + 2, WH + 7);
+        if (cabin) this.paintLogStack(ctx, LW - m - 18, WH + 8);
+        else this.paintWaterCooler(ctx, LW - m - 14, WH + 9);
+      }
+      this.props = c;
+    }
+    this.ctx.drawImage(this.props, 0, 0);
+  }
+
+  // x: left edge, base: the floor row it stands on
+  paintBigPlant(ctx, x, base) {
+    const pot = PAL.plantPot;
+    R(ctx, x + 1, base - 8, 11, 8, pot);
+    R(ctx, x, base - 9, 13, 2, shade(pot, 0.1));
+    R(ctx, x + 2, base - 1, 9, 1, shade(pot, -0.15));
+    R(ctx, x + 6, base - 22, 1, 13, PAL.leafDark);
+    const leaf = (lx, ly, w, h, c = PAL.leaf) => R(ctx, x + lx, base - ly, w, h, c);
+    leaf(1, 15, 5, 3);
+    leaf(-1, 19, 6, 3, PAL.leafDark);
+    leaf(7, 17, 6, 3);
+    leaf(8, 22, 6, 3, PAL.leafDark);
+    leaf(2, 25, 5, 4, shade(PAL.leaf, 0.08));
+    leaf(6, 29, 4, 5);
+    leaf(3, 21, 4, 2);
+  }
+
+  paintWaterCooler(ctx, x, base) {
+    const body = SCENE.light ? '#e6e9f2' : '#b8bccb';
+    R(ctx, x, base - 15, 10, 15, body);
+    R(ctx, x + 8, base - 15, 2, 15, shade(body, -0.15));
+    R(ctx, x + 2, base - 11, 1, 2, '#4b8bff');
+    R(ctx, x + 6, base - 11, 1, 2, PAL.red);
+    R(ctx, x + 1, base - 6, 7, 1, shade(body, -0.2));
+    // the bottle, with a highlight
+    const water = '#8fd3ff';
+    R(ctx, x + 1, base - 24, 8, 9, water);
+    R(ctx, x + 3, base - 26, 4, 2, shade(water, -0.1));
+    R(ctx, x + 2, base - 23, 1, 6, '#e6f7ff');
+    R(ctx, x + 1, base - 19, 8, 1, shade(water, -0.12));
+  }
+
+  paintLogStack(ctx, x, base) {
+    const bark = '#6b4226';
+    const cut = '#d9a066';
+    const log = (lx, ly) => {
+      R(ctx, x + lx + 1, base - ly - 5, 4, 5, bark);
+      R(ctx, x + lx, base - ly - 4, 6, 3, bark);
+      R(ctx, x + lx + 1, base - ly - 4, 4, 3, cut);
+      R(ctx, x + lx + 2, base - ly - 3, 2, 1, shade(cut, -0.2));
+    };
+    for (const [lx, ly] of [[0, 0], [6, 0], [12, 0], [3, 5], [9, 5], [6, 10]]) log(lx, ly);
+  }
+
+  // a rug under each row of desks, its sides running to the vanishing point
+  drawRug(row) {
+    const { ctx } = this;
+    const cabin = SCENE.style === 'cabin';
+    const vy = WH - VP_DROP;
+    const mid = this.LW / 2;
+    const y1 = row.dy - 6;
+    const y2 = Math.min(this.LH - 1, row.dy + 30);
+    const fl = row.x0 - 20;
+    const fr = row.x0 + row.w + 20;
+    const at = (fx, y) => mid + ((fx - mid) * (y - vy)) / (y2 - vy);
+    const base = cabin ? (SCENE.light ? '#b8443a' : '#7a2e22') : SCENE.light ? '#c9b6ec' : '#3a2f6b';
+    const edge = cabin ? '#e3cf9f' : SCENE.light ? '#9d86d6' : '#5a4f8c';
+    for (let y = y1; y <= y2; y++) {
+      const l = Math.round(at(fl, y));
+      const r = Math.round(at(fr, y));
+      const border = y - y1 < 2 || y2 - y < 2;
+      R(ctx, l, y, r - l, 1, border ? edge : base);
+      if (!border) {
+        R(ctx, l, y, 2, 1, edge);
+        R(ctx, r - 2, y, 2, 1, edge);
+        if ((y - y1) % 7 === 3) R(ctx, l + 4, y, r - l - 8, 1, shade(base, cabin ? 0.08 : 0.06));
+      }
+    }
   }
 
   drawWall(t) {
@@ -370,6 +527,7 @@ export class Scene {
     ctx.translate(this.side, 0);
     this.drawBackWall(t, this.LW - 2 * this.side);
     ctx.restore();
+    this.drawCornerProps();
   }
 
   drawBackWall(t, LW) {
@@ -400,7 +558,7 @@ export class Scene {
 
     // window: a starry night in the dark theme, a sunny day in the light one (a still picture in minimal motion)
     const tw = this.calm ? 0 : t;
-    const wx = 8;
+    const wx = 12;
     const wy = 9;
     const ww = Math.min(44, Math.floor(LW / 4));
     // things on the wall stand off it a little and throw a shadow down and right
@@ -440,14 +598,31 @@ export class Scene {
     if (this.halloween) this.drawSpookyWindow(tw, wx, wy, ww);
     R(ctx, wx + Math.floor(ww / 2), wy, 1, 26, PAL.border);
     R(ctx, wx, wy + 13, ww, 1, PAL.border);
-    R(ctx, wx - 3, wy + 26, ww + 6, 2, PAL.borderLight);
+    this.drawCurtains(wx, wy, ww, cabin);
+    // a sill with something on it: a little cactus in the office, a candle in the cabin
+    R(ctx, wx - 4, wy + 26, ww + 8, 3, PAL.borderLight);
+    R(ctx, wx - 4, wy + 28, ww + 8, 1, shade(PAL.borderLight, -0.15));
+    if (cabin) {
+      R(ctx, wx + ww - 9, wy + 21, 3, 5, '#f4ead2');
+      R(ctx, wx + ww - 8, wy + 19 - (this.calm || this.still ? 0 : Math.floor(t / 300) % 2), 1, 2, '#ffb347');
+    } else {
+      R(ctx, wx + ww - 10, wy + 23, 5, 3, PAL.plantPot);
+      R(ctx, wx + ww - 9, wy + 18, 3, 5, PAL.leaf);
+      R(ctx, wx + ww - 10, wy + 20, 1, 2, PAL.leaf);
+      R(ctx, wx + ww - 6, wy + 19, 1, 2, PAL.leaf);
+    }
 
-    // poster of the game's card
-    const px = Math.floor(LW / 2) - 10;
-    // a spider on its thread between the window and the poster, bobbing slowly in full motion
-    const gapL = wx + ww + 3;
-    if (this.halloween && px - 2 - gapL >= 7) {
-      const sx = Math.floor((gapL + px - 2) / 2);
+    // window, poster, kanban board (or the cabin's fireplace) and TV, spread evenly along the
+    // wall; on a narrow wall the poster takes the middle and the board stays away
+    const leftEdge = wx + ww + 8;
+    const middleW = cabin ? 20 : 40;
+    const spare = LW - 52 - leftEdge - 22 - middleW;
+    const gap = spare >= 12 ? Math.floor(spare / 3) : 0;
+    const px = gap ? leftEdge + gap : Math.floor(LW / 2) - 10;
+    const midX = gap ? px + 22 + gap : null;
+    // a spider on its thread just right of the poster, bobbing slowly in full motion
+    if (this.halloween && (!gap || gap >= 8)) {
+      const sx = gap ? px + 22 + Math.floor(gap / 2) : px + 27;
       const sy = 14 + (this.calm ? 0 : Math.round(3 * Math.sin(t / 900)));
       R(ctx, sx, 0, 1, sy, SCENE.light ? PAL.muted : PAL.secondary);
       const leg = SCENE.light ? PAL.ink : '#0a0814';
@@ -544,19 +719,58 @@ export class Scene {
       if (!cabin) R(ctx, mx + mw / 2 - 2, 31, 4, 1, PAL.borderLight);
     }
 
-    // the cabin has a stone fireplace where the office keeps its plant
-    if (cabin && mx - 26 > px + 22) {
-      this.drawFireplace(t, mx - 26);
-    } else if (LW > 230) {
-      const plx = mx > px + 26 ? mx - 18 : LW - 16;
-      R(ctx, plx, WH - 10, 9, 7, PAL.plantPot);
-      R(ctx, plx - 1, WH - 11, 11, 2, shade(PAL.plantPot, 0.08));
-      const sway = this.calm ? 0 : Math.floor(t / 900) % 2;
-      R(ctx, plx + 3, WH - 20, 2, 9, PAL.leafDark);
-      R(ctx, plx - 1 + sway, WH - 18, 4, 3, PAL.leaf);
-      R(ctx, plx + 5 - sway, WH - 22, 4, 3, PAL.leaf);
-      R(ctx, plx + 1, WH - 25, 4, 4, shade(PAL.leaf, 0.08));
+    // between the poster and the TV: the team's kanban board, or the cabin's fireplace
+    if (midX != null && cabin) this.drawFireplace(t, midX + 1);
+    else if (midX != null) this.drawKanban(midX + 1, 9, shadow);
+  }
+
+  // curtains on a rod either side of the window, in folds
+  drawCurtains(wx, wy, ww, cabin) {
+    const { ctx } = this;
+    const cloth = cabin ? (SCENE.light ? '#b8443a' : '#8a3324') : SCENE.light ? '#e9a6bd' : '#5b4596';
+    R(ctx, wx - 7, wy - 5, ww + 14, 1, PAL.ink);
+    R(ctx, wx - 8, wy - 6, 2, 3, PAL.ink);
+    R(ctx, wx + ww + 6, wy - 6, 2, 3, PAL.ink);
+    for (const x0 of [wx - 6, wx + ww + 1]) {
+      for (let i = 0; i < 5; i++) R(ctx, x0 + i, wy - 4, 1, 32 - (i % 2), i % 2 ? shade(cloth, -0.12) : cloth);
+      // the plaid: a darker band across the cabin's curtains
+      if (cabin) for (const y of [wy + 4, wy + 16]) R(ctx, x0, y, 5, 2, shade(cloth, -0.2));
+      R(ctx, x0, wy + 12, 5, 1, PAL.gold); // tie-back
     }
+  }
+
+  // a whiteboard with sticky notes; the Done column fills up as rounds go by
+  drawKanban(x, y, shadow) {
+    const { ctx } = this;
+    const w = 38;
+    const h = 24;
+    const board = SCENE.light ? '#ffffff' : '#d9d6e8';
+    R(ctx, x + 2, y + 2, w + 2, h + 2, shadow);
+    R(ctx, x - 1, y - 1, w + 2, h + 2, PAL.borderLight);
+    R(ctx, x, y, w, h, board);
+    R(ctx, x + 12, y + 2, 1, h - 4, shade(board, -0.18));
+    R(ctx, x + 25, y + 2, 1, h - 4, shade(board, -0.18));
+    // column headers
+    R(ctx, x + 2, y + 2, 8, 1, PAL.muted);
+    R(ctx, x + 15, y + 2, 8, 1, PAL.gold);
+    R(ctx, x + 28, y + 2, 8, 1, PAL.green);
+    const notes = ['#ffd84d', '#ff8fb1', '#7fe9ff', '#a6f5b9'];
+    const done = Math.min(6, Math.max(0, (this.room.round || 1) - 1));
+    const col = (cx, n, seed) => {
+      for (let i = 0; i < n; i++) {
+        const nx = cx + (i % 2) * 5;
+        const ny = y + 5 + Math.floor(i / 2) * 6;
+        R(ctx, nx, ny, 4, 4, notes[(i + seed) % notes.length]);
+        R(ctx, nx, ny + 3, 4, 1, shade(notes[(i + seed) % notes.length], -0.18));
+      }
+    };
+    col(x + 2, Math.max(1, 5 - done), 0);
+    col(x + 15, 2, 1);
+    col(x + 28, done, 2);
+    // marker tray
+    R(ctx, x + 4, y + h + 1, w - 8, 1, PAL.border);
+    R(ctx, x + 8, y + h, 3, 1, PAL.red);
+    R(ctx, x + 13, y + h, 3, 1, PAL.teal);
   }
 
   drawPines(wx, wy, ww) {
@@ -629,6 +843,7 @@ export class Scene {
     const consensus = this.room.consensus;
 
     for (const row of this.rows) {
+      this.drawRug(row);
       // the desk's shadow on the floor in front of it
       R(ctx, row.x0 - 1, row.dy + 19, row.w + 8, 4, SCENE.light ? 'rgba(60, 40, 20, 0.16)' : 'rgba(0, 0, 0, 0.28)');
       R(ctx, row.x0 + 1, row.dy + 23, row.w + 4, 2, SCENE.light ? 'rgba(60, 40, 20, 0.08)' : 'rgba(0, 0, 0, 0.14)');
