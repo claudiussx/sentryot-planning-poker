@@ -7,6 +7,7 @@ const SW = 46; // seat width
 const WH = 50; // wall height
 const ROWH = 64;
 const FIRST_DESK = WH + 22;
+const VP_DROP = 34; // how far above the back wall's foot the vanishing point sits
 // keep in sync with the one-screen media query in style.css
 const FIT_SCREEN = '(min-width: 1101px) and (min-height: 600px)';
 
@@ -167,6 +168,8 @@ export class Scene {
     this.overlay.style.width = `${LW * S}px`;
     this.overlay.style.height = `${LH * S}px`;
     this.ctx.imageSmoothingEnabled = false;
+    // side walls take this much of each edge; the back wall gets the rest
+    this.side = Math.round(Math.min(90, Math.max(10, LW * 0.12)));
 
     this.rows = [];
     this.seats = new Map();
@@ -267,9 +270,112 @@ export class Scene {
     this.draw(this.still ? 0 : t);
   }
 
-  drawWall(t) {
-    const { ctx, LW } = this;
+  // The room's shell in one-point perspective: two side walls and a floor running back to a
+  // vanishing point at about head height. It never moves, so it is drawn once into a cache.
+  drawShell() {
+    const { LW, LH } = this;
+    const key = [LW, LH, SCENE.style, PAL.wall, PAL.wallDark].join('|');
+    if (this.shellKey !== key) {
+      this.shellKey = key;
+      this.shell = this.paintShell();
+    }
+    this.ctx.drawImage(this.shell, 0, 0);
+  }
+
+  paintShell() {
+    const { LW, LH } = this;
+    const c = document.createElement('canvas');
+    c.width = LW;
+    c.height = LH;
+    const ctx = c.getContext('2d');
     const cabin = SCENE.style === 'cabin';
+    const m = this.side;
+    const mid = LW / 2;
+    const vy = WH - VP_DROP; // the vanishing point sits this far above the back wall's foot
+    // where a line from the vanishing point through (bx, by) is at height y
+    const along = (bx, by, y) => mid + ((bx - mid) * (y - vy)) / (by - vy);
+
+    // floor: everything below the back wall, darker towards the back
+    R(ctx, 0, WH, LW, LH - WH, PAL.wallDark);
+    if (cabin) {
+      // planks run towards the back wall: lines from the vanishing point, the odd seam across
+      for (let x = 0; x <= LW - 2 * m; x += 12) {
+        const bx = m + x;
+        for (let y = WH; y < LH; y++) R(ctx, Math.round(along(bx, WH, y)), y, 1, 1, PAL.floorLine);
+      }
+      for (let j = 1, k = 0; ; j++, k++) {
+        const y = Math.round(vy + VP_DROP / (1 - j * 0.14));
+        if (y >= LH || j * 0.14 >= 1) break;
+        for (let x = (k * 23) % 36; x < LW; x += 36) R(ctx, x, y, 7, 1, PAL.floorLine);
+      }
+    } else {
+      // tiles: lines from the vanishing point, cross lines further apart as they come closer
+      for (let x = 0; x <= LW - 2 * m; x += 24) {
+        const bx = m + x;
+        for (let y = WH; y < LH; y++) R(ctx, Math.round(along(bx, WH, y)), y, 1, 1, PAL.floorLine);
+      }
+      for (let j = 1; j * 0.12 < 1; j++) {
+        const y = Math.round(vy + VP_DROP / (1 - j * 0.12));
+        if (y >= LH) break;
+        R(ctx, 0, y, LW, 1, PAL.floorLine);
+      }
+    }
+    // the far floor is in the room's shade
+    for (let y = WH; y < LH; y++) {
+      const k = 1 - (y - WH) / (LH - WH);
+      const a = 0.28 * k * k;
+      if (a > 0.01) R(ctx, 0, y, LW, 1, `rgba(0, 0, 0, ${a.toFixed(3)})`);
+    }
+
+    // side walls, a shade darker than the back wall; their foot runs down towards us
+    for (const side of [-1, 1]) {
+      const wall = shade(PAL.wall, side < 0 ? -0.035 : -0.02);
+      const edge = side < 0 ? m : LW - m;
+      for (let y = 0; y < LH; y++) {
+        const foot = y < WH ? edge : along(edge, WH, y);
+        const w = side < 0 ? Math.round(foot) : Math.round(LW - foot);
+        if (w <= 0) break;
+        R(ctx, side < 0 ? 0 : LW - w, y, w, 1, wall);
+      }
+      // the back wall's lines carry on along the side wall, towards us
+      const line = (by, color) => {
+        for (let x = 0; x < m; x++) {
+          const px = side < 0 ? edge - x : edge + x;
+          const py = vy + ((by - vy) * (mid - px)) / (mid - edge);
+          R(ctx, px, Math.round(py), 1, 1, color);
+        }
+      };
+      if (cabin) {
+        for (let y = 5; y < WH - 4; y += 6) line(y, shade(wall, -0.3));
+      } else {
+        for (const f of [0.35, 0.75]) {
+          const px = Math.round(side < 0 ? edge - m * f : edge + m * f);
+          const top = 0;
+          const foot = vy + ((WH - vy) * (mid - px)) / (mid - edge);
+          R(ctx, px, top, 1, Math.round(foot) - 4, PAL.wallDark);
+        }
+      }
+      for (let k = 0; k < 4; k++) line(WH - 1 - k, k === 3 ? PAL.borderLight : PAL.border);
+      // the corner where the walls meet
+      R(ctx, edge - (side < 0 ? 1 : 0), 0, 1, WH, shade(PAL.wall, -0.09));
+    }
+    return c;
+  }
+
+  drawWall(t) {
+    this.drawShell();
+    const { ctx } = this;
+    // the back wall is drawn in its own coordinates, between the side walls
+    ctx.save();
+    ctx.translate(this.side, 0);
+    this.drawBackWall(t, this.LW - 2 * this.side);
+    ctx.restore();
+  }
+
+  drawBackWall(t, LW) {
+    const { ctx } = this;
+    const cabin = SCENE.style === 'cabin';
+    const shadow = SCENE.light ? 'rgba(60, 40, 20, 0.16)' : 'rgba(0, 0, 0, 0.3)';
     R(ctx, 0, 0, LW, WH, PAL.wall);
     if (cabin) {
       // stacked logs with a lit top edge, a dark seam and the odd knot
@@ -284,18 +390,6 @@ export class Scene {
     R(ctx, 0, WH - 4, LW, 4, PAL.border);
     R(ctx, 0, WH - 4, LW, 1, PAL.borderLight);
 
-    // floor: tiles in the office, staggered planks in the cabin
-    R(ctx, 0, WH, LW, this.LH - WH, PAL.wallDark);
-    if (cabin) {
-      for (let y = WH + 8, k = 0; y < this.LH; y += 8, k++) {
-        R(ctx, 0, y, LW, 1, PAL.floorLine);
-        for (let x = (k * 23) % 48; x < LW; x += 48) R(ctx, x, y - 7, 1, 7, PAL.floorLine);
-      }
-    } else {
-      for (let y = WH + 12; y < this.LH; y += 16) R(ctx, 0, y, LW, 1, PAL.floorLine);
-      for (let x = 8; x < LW; x += 24) R(ctx, x, WH, 1, this.LH - WH, PAL.floorLine);
-    }
-
     // string lights
     for (let x = 4, i = 0; x < LW; x += 9, i++) {
       R(ctx, x, 3 + (i % 2), 3, 1, PAL.border);
@@ -309,6 +403,8 @@ export class Scene {
     const wx = 8;
     const wy = 9;
     const ww = Math.min(44, Math.floor(LW / 4));
+    // things on the wall stand off it a little and throw a shadow down and right
+    R(ctx, wx, wy, ww + 4, 30, shadow);
     R(ctx, wx - 2, wy - 2, ww + 4, 30, PAL.border);
     R(ctx, wx, wy, ww, 26, PAL.sky);
     if (SCENE.light) {
@@ -360,6 +456,7 @@ export class Scene {
       R(ctx, sx - 1, sy + 1, 1, 1, PAL.red);
       R(ctx, sx + 1, sy + 1, 1, 1, PAL.red);
     }
+    R(ctx, px + 1, 9, 22, 26, shadow);
     R(ctx, px - 1, 7, 22, 26, PAL.ink);
     R(ctx, px, 8, 20, 24, PAL.panel);
     drawMark(ctx, px + 1, 9);
@@ -381,6 +478,7 @@ export class Scene {
       // bezel with rounded corners, a lit top edge and a darker bottom edge
       const bx = mx - 4;
       const bw = mw + 8;
+      R(ctx, bx + 3, 8, bw - 2, 27, shadow);
       R(ctx, bx + 1, 6, bw - 2, 27, PAL.border);
       R(ctx, bx, 7, bw, 25, PAL.border);
       R(ctx, bx + 1, 6, bw - 2, 1, PAL.borderLight);
@@ -531,6 +629,9 @@ export class Scene {
     const consensus = this.room.consensus;
 
     for (const row of this.rows) {
+      // the desk's shadow on the floor in front of it
+      R(ctx, row.x0 - 1, row.dy + 19, row.w + 8, 4, SCENE.light ? 'rgba(60, 40, 20, 0.16)' : 'rgba(0, 0, 0, 0.28)');
+      R(ctx, row.x0 + 1, row.dy + 23, row.w + 4, 2, SCENE.light ? 'rgba(60, 40, 20, 0.08)' : 'rgba(0, 0, 0, 0.14)');
       for (const p of row.members) drawChair(ctx, this.seats.get(p.id).cx, row.dy);
       drawDesk(ctx, row.x0 - 4, row.dy, row.w + 8);
       if (this.halloween) {
