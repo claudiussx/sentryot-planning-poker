@@ -362,6 +362,7 @@ function publishPresence(only) {
   const room = state.room;
   const myRoundActive = room && state.myRound === room.round;
   state.rc.publishPresence({
+    v: 2, // v2+ says goodbye explicitly; older tabs only clear their seat
     id: state.me.id,
     name: state.me.name,
     look: state.me.look,
@@ -380,6 +381,7 @@ function publishPresence(only) {
 function sanitizePresence(d) {
   if (!d || typeof d.id !== 'string' || typeof d.name !== 'string') return null;
   return {
+    v: Number.isInteger(d.v) ? d.v : 1,
     id: d.id.slice(0, 16),
     name: d.name.trim().slice(0, 20) || 'Anonymous',
     look: sanitizeLook(d.look),
@@ -424,6 +426,8 @@ function onPresence(raw) {
 function onPresenceGone(id) {
   const p = state.peers.get(id);
   if (!p || p.offline) return;
+  // a tab from before the goodbye message only ever clears its seat: take that as leaving
+  if (p.v < 2) return removePeer(id);
   p.offline = true;
   p.offlineSince = Date.now();
   render();

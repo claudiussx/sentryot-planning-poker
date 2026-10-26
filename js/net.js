@@ -70,6 +70,7 @@ export class RoomClient extends EventTarget {
     this.presenceOn = new Map(); // peer id -> broker indexes that currently hold their seat
     this.seenEvents = new Map(); // event id -> time, to drop the copies from other brokers
     this.queue = Promise.resolve();
+    this.leaving = false; // once set, nothing may put our seat back
   }
 
   async init() {
@@ -137,7 +138,7 @@ export class RoomClient extends EventTarget {
             }
             this.online.add(i);
             this.#status();
-            this.dispatchEvent(new CustomEvent('broker-online', { detail: i }));
+            if (!this.leaving) this.dispatchEvent(new CustomEvent('broker-online', { detail: i }));
             if (!settled) {
               settled = true;
               clearTimeout(timer);
@@ -193,6 +194,7 @@ export class RoomClient extends EventTarget {
   }
 
   async #publish(rel, obj, retain, only) {
+    if (this.leaving) return;
     const payload = obj == null ? new Uint8Array(0) : await this.seal(obj);
     const topic = `${this.base}/${rel}`;
     const sends = [];
@@ -225,6 +227,7 @@ export class RoomClient extends EventTarget {
   // mqtt.js queues writes asynchronously, so the packets go straight to the WebSocket,
   // which browsers still flush while the page closes.
   leaveNow() {
+    this.leaving = true;
     const empty = new Uint8Array(0);
     this.clients.forEach((c, i) => {
       if (!c || !this.online.has(i)) return;
@@ -245,12 +248,23 @@ export class RoomClient extends EventTarget {
     this.online.clear();
   }
 
+  // The Leave button: the page stays open, so send through mqtt.js and wait for it,
+  // but never longer than a moment, and never let a reconnect put the seat back.
   async leave() {
-    try {
-      this.leaveNow();
-    } finally {
-      await Promise.all(this.clients.map((c) => c && new Promise((r) => c.end(false, {}, r))));
-      this.online.clear();
-    }
+    this.leaving = true;
+    const empty = new Uint8Array(0);
+    const within = (ms, work) => Promise.race([work, new Promise((r) => setTimeout(r, ms))]);
+    await within(
+      1500,
+      Promise.all(
+        this.clients.map((c, i) => {
+          if (!c || !this.online.has(i)) return null;
+          if (this.goodbye) c.publish(`${this.base}/evt`, this.goodbye, { qos: 0, retain: false });
+          return new Promise((r) => c.publish(`${this.base}/p/${this.myId}`, empty, { qos: 0, retain: true }, r));
+        }),
+      ),
+    );
+    await within(1500, Promise.all(this.clients.map((c) => c && new Promise((r) => c.end(false, {}, r)))));
+    this.online.clear();
   }
 }
