@@ -93,17 +93,27 @@ export const DECALS = [
   { name: 'Mushroom', rows: ['.rrrr.', 'rwrrwr', 'rrrrrr', '.wwww.', '.w..w.'] },
   { name: 'Crewmate', rows: ['.rrrr.', 'rrrccc', 'rrrrrr', 'rrrrr.', '.rr.r.'] },
   { name: 'Heart', rows: ['rr..rr', 'rrrrrr', 'rrrrrr', '.rrrr.', '..rr..'] },
-  { name: 'Coin', rows: ['.yyyy.', 'yyooyy', 'yyooyy', 'yyooyy', '.yyyy.'] },
+  { name: 'Coin', rows: ['.yyyy.', 'yyddyy', 'yyddyy', 'yyddyy', '.yyyy.'] },
   { name: 'Sword', rows: ['.....s', '....s.', '...s..', 'o.s...', '.o....', 'b.o...'] },
-  { name: 'Apple', rows: ['...bg.', '.rr.rr', 'rrrrr.', 'rrrrr.', 'rrrrrr', '.rr.rr'] },
+  { name: 'Star', rows: ['..yy..', '..yy..', 'yyyyyy', '.yyyy.', '.y..y.'] },
   { name: 'Triangle', rows: ['..ww..', '.wwww.', '.wwww.', 'wwwwww', 'wwwwww'] },
   { name: 'Bug', rows: ['k....k', '.kggk.', 'kggggk', '.gggg.', 'k.kk.k'] },
-  { name: 'Terminal', rows: ['kkkkkk', 'kgkkkk', 'kkgkkk', 'kgkggk', 'kkkkkk'] },
+  { name: 'Diamond', rows: ['..cc..', '.cwcc.', 'cccccc', '.cccc.', '..cc..'] },
   { name: 'Bolt', rows: ['..yyy.', '.yyy..', 'yyyyyy', '..yyy.', '.yyy..'] },
   { name: 'Cat', rows: ['k....k', 'kk..kk', 'kkkkkk', 'kwkkwk', '.kkkk.'] },
+  { name: 'Smiley', rows: ['.yyyy.', 'ykyyky', 'yyyyyy', 'ykyyky', '.ykky.'] },
+  { name: 'Skull', rows: ['.wwww.', 'wkwwkw', 'wkwwkw', 'wwwwww', '.wkkw.', '.wwww.'] },
+  { name: 'Flame', rows: ['..r...', '.rr.r.', '.rror.', 'rrooyr', 'royyor', '.rrrr.'] },
+  { name: 'Planet', rows: ['..pp..', '.pppp.', 'yyyyyy', '.pppp.', '..pp..'] },
+  { name: 'Shield', rows: ['cccccc', 'ccwwcc', 'cwwwwc', 'ccwwcc', '.cccc.', '..cc..'] },
+  { name: 'Potion', rows: ['..bb..', '..ss..', '.pppp.', 'pwpppp', 'pppppp', '.pppp.'] },
+  { name: 'Chomp', rows: ['.yyyy.', 'yyyyy.', 'yyy..w', 'yyyyy.', '.yyyy.'] },
+  { name: 'Rainbow', rows: ['.rrrr.', 'roooor', 'oyyyyo', 'y....y'] },
+  { name: 'Alien', rows: ['.gggg.', 'gggggg', 'gkggkg', 'gkggkg', '.gggg.', '..gg..'] },
+  { name: 'Robot', rows: ['..s...', 'ssssss', 'scsscs', 'ssssss', 'skkkks', 'ssssss'] },
 ];
 
-const DECAL_INKS = { g: '#5ee27a', k: '#1b1730', r: '#ff5d73', w: '#ffffff', c: '#7fe9ff', y: '#ffc93c', o: '#e6a817', s: '#d9d3f2', b: '#8a5532' };
+const DECAL_INKS = { d: '#e6a817', g: '#5ee27a', k: '#1b1730', r: '#ff5d73', w: '#ffffff', c: '#7fe9ff', y: '#ffc93c', o: '#ff9a3d', s: '#d9d3f2', b: '#8a5532', p: '#b9a8ff' };
 
 function drawDecal(ctx, x, y, decal) {
   const rows = DECALS[decal]?.rows || [];
