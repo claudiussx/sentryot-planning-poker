@@ -678,7 +678,8 @@ function cycleDeck() {
   state.myVote = null;
   state.myRound = room.round + 1;
   saveVote();
-  updateRoom({ ...room, deck, round: room.round + 1, label: room.label ?? room.round, revealed: false, timerEnd: null });
+  // a new deck is a fresh vote on the same story, not a re-vote
+  updateRoom({ ...room, deck, round: room.round + 1, label: room.label ?? room.round, revote: 0, revealed: false, timerEnd: null });
   play('round');
   toast(`Deck: ${DECKS[deck].name}`);
   publishPresence();
