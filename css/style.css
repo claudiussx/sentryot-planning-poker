@@ -1,29 +1,13 @@
 /* Pixel Poker: a night-time arcade palette and a sunny light one, pixel borders. */
-/* Fonts are self-hosted (SIL Open Font License): no request leaves for a third party. */
+/* Geist Pixel by Vercel, self-hosted (SIL Open Font License, assets/fonts/GEIST-OFL.txt):
+   no request leaves for a third party. It has one weight; declaring it for every weight
+   stops the browser from faking a bold that would smear the pixels. */
 @font-face {
-  font-family: 'Pixelify Sans';
+  font-family: 'Geist Pixel';
   font-style: normal;
-  font-weight: 400 700;
+  font-weight: 100 900;
   font-display: swap;
-  src: url('../assets/fonts/pixelify-sans-latin.woff2') format('woff2');
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-
-@font-face {
-  font-family: 'Pixelify Sans';
-  font-style: normal;
-  font-weight: 400 700;
-  font-display: swap;
-  src: url('../assets/fonts/pixelify-sans-latin-ext.woff2') format('woff2');
-  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
-}
-
-@font-face {
-  font-family: 'Press Start 2P';
-  font-style: normal;
-  font-weight: 400;
-  font-display: swap;
-  src: url('../assets/fonts/press-start-2p-latin.woff2') format('woff2');
+  src: url('../assets/fonts/geist-pixel-square.woff2') format('woff2');
 }
 
 :root {
@@ -63,8 +47,8 @@
   --warn-bg: #ff5d7322;
   --warn-fg: #ffb3bf;
   --px: 4px;
-  --font: 'Pixelify Sans', ui-monospace, 'SF Mono', Menlo, monospace;
-  --font-display: 'Press Start 2P', 'Pixelify Sans', ui-monospace, monospace;
+  --font: 'Geist Pixel', ui-monospace, 'SF Mono', Menlo, monospace;
+  --font-display: 'Geist Pixel', ui-monospace, 'SF Mono', Menlo, monospace;
   color-scheme: dark;
 }
 
@@ -247,7 +231,7 @@ button {
 .btn-big {
   min-height: 52px;
   font-family: var(--font-display);
-  font-size: 14px;
+  font-size: 18px;
   padding: 10px 20px;
 }
 
@@ -399,7 +383,7 @@ input::placeholder {
 
 .lobby-brand h1 {
   font-family: var(--font-display);
-  font-size: clamp(22px, 5vw, 34px);
+  font-size: clamp(30px, 6vw, 46px);
   line-height: 1.35;
   margin: 18px 0 10px;
   color: var(--accent);
@@ -512,7 +496,7 @@ input::placeholder {
 
 .topbar-kicker {
   font-family: var(--font-display);
-  font-size: 9px;
+  font-size: 13px;
   color: var(--gold-text);
   letter-spacing: 0.05em;
 }
@@ -591,7 +575,7 @@ input::placeholder {
 
 .round-chip {
   font-family: var(--font-display);
-  font-size: 10px;
+  font-size: 14px;
   color: var(--ink);
   background: var(--accent-2);
   padding: 6px 8px;
@@ -618,7 +602,7 @@ input::placeholder {
 
 .host-tag {
   font-family: var(--font-display);
-  font-size: 9px;
+  font-size: 13px;
   color: var(--gold-text);
   width: 100%;
 }
@@ -791,7 +775,7 @@ input::placeholder {
   background: var(--paper);
   color: var(--ink);
   font-family: var(--font-display);
-  font-size: 18px;
+  font-size: 24px;
   display: grid;
   place-items: center;
   margin: 4px;
@@ -867,7 +851,7 @@ input::placeholder {
 }
 
 .card-small {
-  font-size: 14px;
+  font-size: 19px;
 }
 
 /* ---------- side panels ---------- */
@@ -878,7 +862,7 @@ input::placeholder {
 
 .panel h2 {
   font-family: var(--font-display);
-  font-size: 11px;
+  font-size: 15px;
   color: var(--secondary);
   margin: 0 0 12px;
   letter-spacing: 0.04em;
@@ -935,7 +919,7 @@ input::placeholder {
 
 .p-crown {
   color: var(--gold-text);
-  font-size: 12px;
+  font-size: 14px;
   font-family: var(--font-display);
 }
 
@@ -951,7 +935,7 @@ input::placeholder {
 
 .p-state.is-value {
   font-family: var(--font-display);
-  font-size: 12px;
+  font-size: 15px;
   color: var(--ink);
   background: var(--paper);
   padding: 4px 6px;
@@ -998,7 +982,7 @@ input::placeholder {
 
 .res-tile .v {
   font-family: var(--font-display);
-  font-size: 26px;
+  font-size: 34px;
   color: var(--text);
 }
 
@@ -1036,7 +1020,7 @@ input::placeholder {
 
 .dist-val {
   font-family: var(--font-display);
-  font-size: 11px;
+  font-size: 14px;
   text-align: right;
 }
 
@@ -1200,11 +1184,11 @@ input::placeholder {
   .card {
     width: 50px;
     height: 72px;
-    font-size: 14px;
+    font-size: 19px;
   }
 
   .card-small {
-    font-size: 11px;
+    font-size: 15px;
   }
 
   .hand {
@@ -1377,11 +1361,11 @@ input::placeholder {
   .card {
     width: 50px;
     height: 70px;
-    font-size: 15px;
+    font-size: 20px;
   }
 
   .card-small {
-    font-size: 12px;
+    font-size: 16px;
   }
 
   .hand {
@@ -1515,7 +1499,7 @@ input::placeholder {
   gap: 8px;
   color: var(--accent);
   font-family: var(--font-display);
-  font-size: 9px;
+  font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.1em;
 }
@@ -1537,13 +1521,13 @@ input::placeholder {
 .emoji-panel {
   position: absolute;
   left: 16px;
+  right: 16px;
   bottom: 64px;
   z-index: 3;
   display: grid;
-  /* fixed cells: a compact picker however wide the chat panel is */
-  grid-template-columns: repeat(8, 34px);
-  grid-auto-rows: 34px;
-  max-width: calc(100% - 32px);
+  /* cells shrink to the chat column, never past it, and stop growing at 34px */
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  max-width: 298px;
   gap: 2px;
   padding: 6px;
   background: var(--menu-bg);
@@ -1553,12 +1537,14 @@ input::placeholder {
 }
 
 .emoji-opt {
-  width: 34px;
-  height: 34px;
+  width: 100%;
+  aspect-ratio: 1;
+  min-width: 0;
   padding: 0;
   border: 0;
   background: transparent;
-  font-size: 20px;
+  font-size: clamp(14px, 5.5vw, 20px);
+  overflow: hidden;
   line-height: 1;
   cursor: pointer;
   /* system emoji, not the pixel font */
@@ -1660,7 +1646,7 @@ input::placeholder {
 .menu-value {
   color: var(--gold-text);
   font-family: var(--font-display);
-  font-size: 10px;
+  font-size: 14px;
 }
 
 :root[data-font='normal'] .menu-value {
