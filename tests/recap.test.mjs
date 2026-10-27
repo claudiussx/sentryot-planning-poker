@@ -37,3 +37,20 @@ test('nothing to award in an empty session', () => {
 test('t-shirt rounds show sizes', () => {
   assert.equal(computeRecap([round(1, { Ana: 'M', Bo: 'L' }, null, 'tshirt')]).list[0].result, 'L');
 });
+
+test('the wild card is the lone outlier, not the crowd at the other end', () => {
+  const r = computeRecap([round(1, { Ana: '3', Bo: '3', Cy: '3', Dee: '5', Raj: '13' })]);
+  const edge = r.awards.find((a) => a.key === 'edge');
+  assert.deepEqual(edge.names, ['Raj']);
+  assert.equal(edge.line, 'stood apart in a big spread once');
+});
+
+test('two people far apart are both wild cards', () => {
+  const r = computeRecap([round(1, { Ana: '1', Bo: '5', Cy: '5', Dee: '13' })]);
+  assert.deepEqual(r.awards.find((a) => a.key === 'edge').names, ['Ana', 'Dee']);
+});
+
+test('no wild card when the spread is split down the middle', () => {
+  const r = computeRecap([round(1, { Ana: '2', Bo: '2', Cy: '13', Dee: '13' })]);
+  assert.equal(r.awards.find((a) => a.key === 'edge'), undefined);
+});

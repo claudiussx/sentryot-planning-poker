@@ -24,6 +24,12 @@ export function computeRecap(rounds) {
       agreement += s.agreement;
       scored++;
     }
+    // the wild card is whoever stood apart in a big spread: the smaller group at an extreme
+    // (both ends when they are the same size), never the side most people were on
+    const scaled = r.votes.map((v) => scaleOf(r.deck, v.vote)).filter((n) => n != null);
+    const atMin = scaled.filter((n) => n === s.min).length;
+    const atMax = scaled.filter((n) => n === s.max).length;
+    const outlier = (n) => s.spread && ((n === s.min && atMin <= atMax) || (n === s.max && atMax <= atMin)) && (n === s.min ? atMin : atMax) < scaled.length / 2;
     for (const v of r.votes) {
       const p = person(v.id, v.name);
       if (v.vote === 'coffee') p.coffee++;
@@ -31,7 +37,7 @@ export function computeRecap(rounds) {
       const n = scaleOf(r.deck, v.vote);
       if (n == null) continue;
       if (n === s.suggested) p.match++;
-      if (s.spread && (n === s.min || n === s.max)) p.edge++;
+      if (outlier(n)) p.edge++;
     }
     const first = r.votes.find((v) => v.id === r.first);
     if (first) person(first.id, first.name).first++;
@@ -51,7 +57,7 @@ export function computeRecap(rounds) {
     awards: [
       award('match', 'Mind reader', 'idea', (n) => `picked the suggested card ${times(n)}`),
       award('first', 'Fastest draw', 'rocket', (n) => `first to vote ${times(n)}`),
-      award('edge', 'Wild card', 'fire', (n) => `at the edge of a big spread ${times(n)}`),
+      award('edge', 'Wild card', 'fire', (n) => `stood apart in a big spread ${times(n)}`),
       award('coffee', 'Coffee lover', 'coffee', (n) => `asked for coffee ${times(n)}`),
       award('unsure', 'Deep thinker', 'question', (n) => `played ? ${times(n)}`),
     ].filter(Boolean),
