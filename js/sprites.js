@@ -1,3 +1,5 @@
+import { seasonFor } from './season.js';
+
 // Procedural pixel-art characters. Every shape is a handful of fillRects on a
 // low-resolution canvas that CSS scales up with `image-rendering: pixelated`.
 
@@ -101,7 +103,7 @@ export const ROOM_STYLE_IDS = Object.keys(ROOM_STYLES);
 export const roomStyleName = (id) => (ROOM_STYLES[id] || ROOM_STYLES.office).name;
 
 export const PAL = { ...DARK };
-export const SCENE = { light: false, style: 'office' };
+export const SCENE = { light: false, style: 'office', season: typeof location === 'undefined' ? 'none' : seasonFor(new Date(), location.search) };
 
 export function setSceneTheme(light, style = SCENE.style) {
   const room = ROOM_STYLES[style] ? style : 'office';
@@ -252,6 +254,48 @@ export function drawPumpkin(ctx, x, base, flicker = false) {
   PUMPKIN.forEach((row, y) => {
     for (let i = 0; i < row.length; i++) if (inks[row[i]]) R(ctx, x + i, top + y, 1, 1, inks[row[i]]);
   });
+}
+
+// ---------- Christmas props ----------
+
+// box and ribbon colours, picked per desk end so a row is not all one colour
+const PRESENTS = [
+  ['#e8323f', '#ffc93c'],
+  ['#2fae55', '#ff5d73'],
+  ['#4b8bff', '#f7f3ff'],
+  ['#8b6cff', '#ffc93c'],
+];
+
+// a wrapped present standing on the desk, 7 x 6 like the pumpkin it replaces
+export function drawPresent(ctx, x, base, k = 0) {
+  const [box, ribbon] = PRESENTS[k % PRESENTS.length];
+  R(ctx, x, base - 3, 7, 4, box);
+  R(ctx, x + 6, base - 3, 1, 4, shade(box, -0.2));
+  R(ctx, x, base - 4, 7, 1, shade(box, 0.15));
+  R(ctx, x + 3, base - 4, 1, 5, ribbon);
+  R(ctx, x, base - 2, 7, 1, ribbon);
+  R(ctx, x + 2, base - 5, 1, 1, ribbon);
+  R(ctx, x + 4, base - 5, 1, 1, ribbon);
+}
+
+// a Santa hat over the hair: the cone leans right and its tip flops down to a pompom
+function drawSantaHat(ctx, cx, hy) {
+  const red = '#e8323f';
+  const dark = '#a81f2b';
+  const fur = '#f7f3ff';
+  const furShade = '#cfc6e8';
+  R(ctx, cx - 5, hy - 3, 10, 2, red);
+  R(ctx, cx - 4, hy - 5, 8, 2, red);
+  R(ctx, cx - 2, hy - 7, 6, 2, red);
+  R(ctx, cx + 1, hy - 8, 4, 1, red);
+  R(ctx, cx + 4, hy - 7, 2, 2, red);
+  R(ctx, cx - 5, hy - 3, 1, 2, dark);
+  R(ctx, cx - 4, hy - 5, 1, 2, dark);
+  R(ctx, cx - 2, hy - 7, 1, 2, dark);
+  R(ctx, cx + 5, hy - 6, 3, 3, fur);
+  R(ctx, cx + 6, hy - 4, 2, 1, furShade);
+  R(ctx, cx - 6, hy - 1, 12, 2, fur);
+  R(ctx, cx - 6, hy, 12, 1, furShade);
 }
 
 export function shade(hex, amt) {
@@ -801,6 +845,7 @@ export function drawCharacter(ctx, c) {
     drawFace(ctx, cx, hy, look, face);
     drawHair(ctx, cx, hy, style, hairColor, skin);
     if (c.crown) drawCrown(ctx, cx, hy);
+    else if (SCENE.season === 'christmas') drawSantaHat(ctx, cx, hy);
     const armTop = sy + 14;
     const armLen = Math.max(2, ty + 3 - armTop);
     R(ctx, cx - 10, armTop, 3, armLen, sleeve);
@@ -818,6 +863,7 @@ export function drawCharacter(ctx, c) {
   drawFace(ctx, cx, hy, look, face);
   drawHair(ctx, cx, hy, style, hairColor, skin);
   if (c.crown) drawCrown(ctx, cx, hy);
+  else if (SCENE.season === 'christmas') drawSantaHat(ctx, cx, hy);
 
   if (c.paper) drawPaper(ctx, cx, dy, c.paper);
 

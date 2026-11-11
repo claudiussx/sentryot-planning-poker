@@ -1,7 +1,6 @@
 // The planning room: wall, desks, characters and effects on one low-res canvas,
 // with a DOM overlay for crisp name plates and click targets.
-import { PAL, R, drawCharacter, drawChair, drawDesk, drawMark, drawText, SCENE, textWidth, drawIcon, drawEmoteBubble, drawBadgeCheck, seedOf, rng, shade, drawPet, drawPumpkin } from './sprites.js';
-import { seasonFor } from './season.js';
+import { PAL, R, drawCharacter, drawChair, drawDesk, drawMark, drawText, SCENE, textWidth, drawIcon, drawEmoteBubble, drawBadgeCheck, seedOf, rng, shade, drawPet, drawPumpkin, drawPresent } from './sprites.js';
 
 const SW = 46; // seat width
 const WH = 50; // wall height
@@ -14,6 +13,8 @@ const FIT_SCREEN = '(min-width: 1101px) and (min-height: 600px)';
 const CONFETTI = [PAL.teal, PAL.cyan, PAL.gold, PAL.red, PAL.pink, PAL.green, PAL.white];
 const SPOOKY_LIGHTS = ['#ff8a1f', '#9b5cff', '#7dff6a'];
 const WARM_LIGHTS = ['#ffd27a', '#ffb347', '#ffe9b0'];
+const XMAS_LIGHTS = ['#ff4d5e', '#5ee27a', '#ffd84d', '#7fe9ff'];
+const GARLAND = '#2b7a45';
 const CHALKBOARD = '#2e4a3b';
 // a tiny bat, wings up and wings down
 const BAT = [
@@ -41,7 +42,14 @@ export class Scene {
     this.room = { revealed: false, consensus: false, timerEnd: null };
     this.still = false;
     this.calm = false;
-    this.halloween = seasonFor(new Date(), location.search) === 'halloween';
+    this.halloween = SCENE.season === 'halloween';
+    this.christmas = SCENE.season === 'christmas';
+    this.flakes = Array.from({ length: 16 }, (_, i) => {
+      const r = rng(i + 41);
+      return { x: r(), y: r(), speed: 0.6 + r() * 0.8, sway: r() * 6 };
+    });
+    // twinkling bulbs on the corner tree, as offsets from its left edge and floor row
+    this.treeLights = [[2, -12], [9, -13], [5, -17], [10, -18], [3, -19], [7, -22], [4, -25], [8, -26]];
     this.stars = Array.from({ length: 14 }, (_, i) => {
       const r = rng(i + 11);
       return { x: r(), y: r(), p: r() * 3000 };
@@ -440,13 +448,60 @@ export class Scene {
       const m = this.side;
       const cabin = SCENE.style === 'cabin';
       if (LW >= 150) {
-        this.paintBigPlant(ctx, m + 2, WH + 7);
+        if (this.christmas) this.paintTree(ctx, m + 2, WH + 7);
+        else this.paintBigPlant(ctx, m + 2, WH + 7);
         if (cabin) this.paintLogStack(ctx, LW - m - 18, WH + 8);
         else this.paintWaterCooler(ctx, LW - m - 14, WH + 9);
       }
       this.props = c;
     }
     this.ctx.drawImage(this.props, 0, 0);
+    if (this.christmas && LW >= 150) this.drawTreeLights(this.side + 2, WH + 7);
+  }
+
+  // x: left edge, base: the floor row it stands on; the bulbs are drawn every frame on top
+  paintTree(ctx, x, base) {
+    const pot = '#a81f2b';
+    R(ctx, x + 3, base - 4, 7, 4, pot);
+    R(ctx, x + 2, base - 5, 9, 2, '#e8323f');
+    R(ctx, x + 5, base - 7, 3, 2, '#6b4226');
+    const cx = x + 6;
+    // three tiers, each wider at the bottom, lit on the left and shaded on the right
+    for (const [bottom, w, h] of [
+      [base - 8, 15, 6],
+      [base - 13, 12, 6],
+      [base - 18, 9, 7],
+    ]) {
+      for (let r = 0; r < h; r++) {
+        const rw = Math.max(1, Math.round(w - (r * (w - 2)) / (h - 1)));
+        const left = cx - Math.floor(rw / 2);
+        R(ctx, left, bottom - r, rw, 1, PAL.leafDark);
+        R(ctx, left, bottom - r, Math.ceil(rw / 2), 1, PAL.leaf);
+      }
+    }
+    // baubles that hang still, and a gold star on top
+    for (const [bx, by, c] of [
+      [1, -9, '#e8323f'],
+      [11, -10, '#4b8bff'],
+      [6, -15, '#ffc93c'],
+      [2, -20, '#4b8bff'],
+      [9, -21, '#e8323f'],
+    ]) {
+      R(ctx, x + bx, base + by, 2, 2, c);
+      R(ctx, x + bx, base + by, 1, 1, shade(c, 0.35));
+    }
+    R(ctx, cx - 1, base - 28, 3, 3, '#ffc93c');
+    R(ctx, cx, base - 29, 1, 5, '#ffc93c');
+    R(ctx, cx - 2, base - 27, 5, 1, '#ffc93c');
+    R(ctx, cx, base - 27, 1, 1, '#fff2c4');
+  }
+
+  drawTreeLights(x, base) {
+    const t = this.calm || this.still ? 0 : performance.now();
+    this.treeLights.forEach(([lx, ly], i) => {
+      const on = Math.floor(t / 500 + i * 1.3) % 3 !== 0;
+      R(this.ctx, x + lx, base + ly, 1, 1, on ? XMAS_LIGHTS[i % 4] : shade(PAL.leafDark, -0.2));
+    });
   }
 
   // x: left edge, base: the floor row it stands on
@@ -550,10 +605,16 @@ export class Scene {
 
     // string lights
     for (let x = 4, i = 0; x < LW; x += 9, i++) {
-      R(ctx, x, 3 + (i % 2), 3, 1, PAL.border);
+      if (this.christmas) {
+        // a pine garland swags between the bulbs
+        R(ctx, x - 4, 2 + (i % 2), 9, 3, GARLAND);
+        R(ctx, x - 4, 2 + (i % 2), 9, 1, shade(GARLAND, 0.18));
+        R(ctx, x - 2, 4 + (i % 2), 1, 1, shade(GARLAND, -0.2));
+      } else R(ctx, x, 3 + (i % 2), 3, 1, PAL.border);
       // minimal motion keeps only the lights, at a slower pace
       const on = Math.floor((this.calm ? t / 3.5 : t) / 600 + i) % 3 !== 0;
-      R(ctx, x + 1, 4 + (i % 2), 1, 2, on ? (this.halloween ? SPOOKY_LIGHTS[i % 3] : cabin ? WARM_LIGHTS[i % 3] : CONFETTI[i % 5]) : PAL.border);
+      const lit = this.christmas ? XMAS_LIGHTS[i % 4] : this.halloween ? SPOOKY_LIGHTS[i % 3] : cabin ? WARM_LIGHTS[i % 3] : CONFETTI[i % 5];
+      R(ctx, x + 1, 4 + (i % 2), 1, 2, on ? lit : this.christmas ? shade(GARLAND, -0.3) : PAL.border);
     }
 
     // window: a starry night in the dark theme, a sunny day in the light one (a still picture in minimal motion)
@@ -592,16 +653,23 @@ export class Scene {
       const bw = 4 + ((i * 7) % 5);
       const bh = 5 + ((i * 13) % 9);
       R(ctx, wx + x, wy + 26 - bh, Math.min(bw, ww - x), bh, PAL.skyline);
+      if (this.christmas) R(ctx, wx + x, wy + 26 - bh, Math.min(bw, ww - x), 1, SCENE.light ? '#ffffff' : '#c9d3e6');
       if (i % 2 && !SCENE.light) R(ctx, wx + x + 1, wy + 26 - bh + 2, 1, 1, PAL.gold);
       x += bw + 1;
     }
     if (this.halloween) this.drawSpookyWindow(tw, wx, wy, ww);
+    if (this.christmas) this.drawSnowyWindow(tw, wx, wy, ww, cabin);
     R(ctx, wx + Math.floor(ww / 2), wy, 1, 26, PAL.border);
     R(ctx, wx, wy + 13, ww, 1, PAL.border);
     this.drawCurtains(wx, wy, ww, cabin);
     // a sill with something on it: a little cactus in the office, a candle in the cabin
     R(ctx, wx - 4, wy + 26, ww + 8, 3, PAL.borderLight);
     R(ctx, wx - 4, wy + 28, ww + 8, 1, shade(PAL.borderLight, -0.15));
+    if (this.christmas) {
+      const snow = SCENE.light ? '#ffffff' : '#dfe6f3';
+      R(ctx, wx - 3, wy + 25, ww + 6, 1, snow);
+      for (let x = 2; x < ww; x += 9) R(ctx, wx + x, wy + 24, 4, 1, snow);
+    }
     if (cabin) {
       R(ctx, wx + ww - 9, wy + 21, 3, 5, '#f4ead2');
       R(ctx, wx + ww - 8, wy + 19 - (this.calm || this.still ? 0 : Math.floor(t / 300) % 2), 1, 2, '#ffb347');
@@ -804,6 +872,18 @@ export class Scene {
     }
     R(ctx, x + 4, top + 8, 10, 13, '#140c0a');
     R(ctx, x + 5, WH - 6, 8, 2, '#6b3f22');
+    if (this.christmas) {
+      // two stockings hung from the mantel, toes pointing right
+      for (const [sx, c] of [
+        [x + 1, '#e8323f'],
+        [x + 13, '#2fae55'],
+      ]) {
+        R(ctx, sx, top + 1, 4, 2, '#f7f3ff');
+        R(ctx, sx, top + 3, 3, 4, c);
+        R(ctx, sx + 1, top + 6, 4, 2, c);
+        R(ctx, sx + 4, top + 7, 1, 1, shade(c, -0.25));
+      }
+    }
     const f = this.calm || this.still ? 0 : Math.floor(t / 140) % 3;
     const flame = [
       [0, 0, 0],
@@ -813,6 +893,18 @@ export class Scene {
     R(ctx, x + 6, WH - 9 + flame[0], 6, 3 - flame[0], '#ff8a1f');
     R(ctx, x + 7, WH - 11 + flame[1], 4, 3, '#ffb347');
     R(ctx, x + 8, WH - 13 + flame[2], 2, 3, '#ffe066');
+  }
+
+  // snow falling past the window onto a white ground; in minimal motion it hangs where it is
+  drawSnowyWindow(t, wx, wy, ww, cabin) {
+    const { ctx } = this;
+    const snow = SCENE.light ? '#ffffff' : '#dfe6f3';
+    if (!cabin) R(ctx, wx, wy + 24, ww, 2, snow);
+    for (const f of this.flakes) {
+      const y = wy + Math.floor((f.y * 24 + (t / 90) * f.speed) % 24);
+      const x = wx + 1 + Math.floor((f.x * (ww - 3) + Math.sin(t / 700 + f.sway) * 1.5 + ww) % (ww - 2));
+      R(ctx, x, y, 1, 1, snow);
+    }
   }
 
   // bats over the skyline and a cobweb in the top corner of the window
@@ -854,6 +946,12 @@ export class Scene {
         const flick = (k) => !this.calm && !this.still && (t + k * 977) % 2300 < 140;
         drawPumpkin(ctx, row.x0 - 4, row.dy + 5, flick(row.dy));
         drawPumpkin(ctx, row.x0 + row.w - 3, row.dy + 5, flick(row.dy + 1));
+      }
+      if (this.christmas) {
+        // a wrapped present at both ends of every desk
+        const k = Math.floor(row.dy / 7);
+        drawPresent(ctx, row.x0 - 4, row.dy + 5, k);
+        drawPresent(ctx, row.x0 + row.w - 3, row.dy + 5, k + 1);
       }
       row.members.forEach((p, i) => this.drawPlayer(p, i, t, now, revealed, consensus));
     }
